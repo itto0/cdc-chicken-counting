@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import { useState } from "react";
+import type { ComponentType } from "react";
 import {
   LayoutDashboard,
   Radio,
@@ -6,12 +7,13 @@ import {
   FileText,
   Settings as SettingsIcon,
 } from "lucide-react";
-import { TabKey } from "./types";
+import { TabKey, LineSummary } from "./types";
+import { OverviewView } from "./components/OverviewView";
 
 interface NavTab {
   key: TabKey;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
 }
 
 const TABS: NavTab[] = [
@@ -24,6 +26,15 @@ const TABS: NavTab[] = [
 
 export function App() {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [summary] = useState<LineSummary>({
+    line_id: "line-1",
+    total_today: 48320,
+    avg_rate_per_min: 118,
+    target: 62000,
+    attainment_pct: 77.9,
+    camera_status: "online",
+    detection_confidence_pct: 98.4,
+  });
 
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col font-sans">
@@ -56,10 +67,26 @@ export function App() {
         </nav>
       </header>
       <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
-        <h2 className="text-2xl font-semibold mb-4 capitalize">{activeTab} View</h2>
-        <div className="p-6 bg-slate-800 rounded-lg border border-slate-700 text-slate-300 shadow">
-          Ready for {activeTab} view components.
-        </div>
+        {activeTab === "overview" ? (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold tracking-tight text-slate-100">
+                Ringkasan Hari Ini
+              </h2>
+              <span className="text-xs text-slate-400">
+                Dashboard Operasional & Pemantauan Kuota
+              </span>
+            </div>
+            <OverviewView summary={summary} />
+          </div>
+        ) : (
+          <div>
+            <h2 className="text-2xl font-semibold mb-4 capitalize">{activeTab} View</h2>
+            <div className="p-6 bg-slate-800 rounded-lg border border-slate-700 text-slate-300 shadow">
+              Ready for {activeTab} view components.
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
