@@ -1,9 +1,13 @@
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from services.api.src.api.live import broadcast_line_update
 from services.api.src.db.models import CountAggregate, CountEvent, HealthSample
 from services.api.src.db.session import get_db
+from services.api.src.services.alarms import AlarmEvaluator
 from shared.contracts import SyncBatchPayload
 
 router = APIRouter(prefix="/api/v1/sync", tags=["sync"])
@@ -59,6 +63,85 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
         health_ingested = True
 
     db.commit()
+
+    evaluator = AlarmEvaluator(db)
+
+    # Wire Alarm Evaluator and SSE Broadcaster for aggregates
+    if payload.aggregates:
+        today_start_naive = (
+            datetime.now(timezone.utc)
+            .replace(hour=0, minute=0, second=0, microsecond=0)
+            .replace(tzinfo=None)
+        )
+
+        total_today = (
+            db.query(func.count(CountEvent.id))
+            .filter(
+                CountEvent.line_id == payload.line_id,
+                CountEvent.ts_utc >= today_start_naive,
+            )
+            .scalar()
+            or 0
+        )
+        if total_today == 0:
+            total_today = (
+                db.query(func.sum(CountAggregate.count))
+                .filter(
+                    CountAggregate.line_id == payload.line_id,
+                    CountAggregate.window_start >= today_start_naive,
+                )
+                .scalar()
+                or 0
+            )
+        if total_today == 0 and payload.aggregates:
+            total_today = sum(a.count for a in payload.aggregates)
+
+        for agg in payload.aggregates:
+            alarm = evaluator.evaluate_rate(payload.line_id, agg.rate_per_min)
+            if alarm is not None:
+                broadcast_line_update(
+                    payload.line_id,
+                    "alarm",
+                    {
+                        "type": alarm.alarm_type,
+                        "severity": alarm.severity,
+                        "msg": alarm.message,
+                    },
+                )
+
+            broadcast_line_update(
+                payload.line_id,
+                "count",
+                {
+                    "total_today": int(total_today),
+                    "rate_per_min": agg.rate_per_min,
+                    "status": agg.status,
+                },
+            )
+
+    # Wire Alarm Evaluator and SSE Broadcaster for health
+    if payload.health is not None:
+        alarm = evaluator.evaluate_health(payload.line_id, payload.health)
+        if alarm is not None:
+            broadcast_line_update(
+                payload.line_id,
+                "alarm",
+                {
+                    "type": alarm.alarm_type,
+                    "severity": alarm.severity,
+                    "msg": alarm.message,
+                },
+            )
+
+        broadcast_line_update(
+            payload.line_id,
+            "health",
+            {
+                "fps": payload.health.fps,
+                "latency_ms": payload.health.latency_p95_ms,
+                "status": payload.health.stream_state,
+            },
+        )
 
     return {
         "status": "success",

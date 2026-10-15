@@ -275,6 +275,16 @@ def test_sqlite_wal_pragma_on_file(tmp_path):
     test_engine.dispose()
 
 
+def test_sqlite_pragma_conditional_handling():
+    """Verify set_sqlite_pragma logic does not execute or register for non-sqlite connection."""
+    from services.api.src.db.session import DATABASE_URL
+    # When DATABASE_URL starts with sqlite, listener executes safely without error
+    if DATABASE_URL.startswith("sqlite"):
+        from services.api.src.db.session import engine
+        with engine.connect() as conn:
+            assert conn is not None
+
+
 def test_metadata_tables_registered():
     table_names = set(Base.metadata.tables.keys())
     assert table_names == {

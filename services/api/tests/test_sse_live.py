@@ -23,7 +23,7 @@ def clean_broadcaster():
 
 def test_sse_live_endpoint_returns_event_stream():
     client = TestClient(app)
-    with client.stream("GET", "/api/v1/lines/lineA/live") as response:
+    with client.stream("GET", "/api/v1/lines/lineA/live?max_events=2") as response:
         assert response.status_code == 200
         assert "text/event-stream" in response.headers["content-type"]
         assert response.headers.get("cache-control") == "no-cache"
@@ -31,7 +31,7 @@ def test_sse_live_endpoint_returns_event_stream():
 
 def test_sse_events_live_alias_endpoint():
     client = TestClient(app)
-    with client.stream("GET", "/api/v1/lines/lineA/events/live") as response:
+    with client.stream("GET", "/api/v1/lines/lineA/events/live?max_events=2") as response:
         assert response.status_code == 200
         assert "text/event-stream" in response.headers["content-type"]
 

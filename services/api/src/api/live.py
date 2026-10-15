@@ -125,15 +125,6 @@ async def live_stream(
     heartbeat_interval: float = Query(default=15.0, description="Heartbeat interval in seconds"),
 ):
     """Server-Sent Events endpoint delivering real-time line telemetry."""
-    is_test_client = bool(
-        (request.client and request.client.host == "testclient")
-        or request.headers.get("user-agent") == "testclient"
-    )
-    if is_test_client and max_events is None and timeout is None:
-        max_events = 2
-        if heartbeat_interval == 15.0:
-            heartbeat_interval = 0.05
-
     async def event_generator():
         queue = broadcaster.subscribe(line_id)
         event_count = 0

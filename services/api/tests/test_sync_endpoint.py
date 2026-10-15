@@ -205,3 +205,73 @@ def test_sync_batch_invalid_payload():
     }
     resp = client.post("/api/v1/sync/batch", json=payload)
     assert resp.status_code == 422
+
+
+def test_sync_batch_evaluates_alarms_and_broadcasts(setup_test_db, monkeypatch):
+    """Verify that ingest sync evaluates alarms and broadcasts SSE telemetry."""
+    from services.api.src.db.models import Alarm
+    from services.api.src.api.live import broadcaster
+
+    broadcasted_events = []
+
+    def mock_publish(line_id, event_type, data):
+        broadcasted_events.append((line_id, event_type, data))
+        return 1
+
+    monkeypatch.setattr(broadcaster, "publish", mock_publish)
+
+    client = TestClient(app)
+    start = datetime(2026, 10, 15, 9, 0, 0, tzinfo=timezone.utc).isoformat()
+    end = datetime(2026, 10, 15, 9, 1, 0, tzinfo=timezone.utc).isoformat()
+
+    payload = {
+        "line_id": "lineAlarmTest",
+        "events": [],
+        "aggregates": [
+            {
+                "window_start": start,
+                "window_end": end,
+                "count": 95,
+                "rate_per_min": 95.0,  # Below 110 -> CRITICAL LOW_RATE
+                "confidence_avg": 0.95,
+                "status": "CRITICAL",
+            }
+        ],
+        "health": {
+            "fps": 0.0,
+            "latency_p95_ms": 250.0,
+            "cpu_pct": 10.0,
+            "mem_pct": 20.0,
+            "stream_state": "OFFLINE",  # OFFLINE -> CRITICAL STREAM_OFFLINE
+            "model_name": "yolo26n",
+            "model_version": "v1.0",
+        },
+    }
+
+    resp = client.post("/api/v1/sync/batch", json=payload)
+    assert resp.status_code == 200
+
+    # 1. Verify Alarms recorded in DB
+    with setup_test_db() as db:
+        alarms = db.scalars(select(Alarm).where(Alarm.line_id == "lineAlarmTest")).all()
+        assert len(alarms) >= 1
+        alarm_types = {a.alarm_type for a in alarms}
+        assert "LOW_RATE" in alarm_types
+        assert "STREAM_OFFLINE" in alarm_types
+
+    # 2. Verify broadcasted events
+    event_types = [item[1] for item in broadcasted_events]
+    assert "alarm" in event_types
+    assert "count" in event_types
+    assert "health" in event_types
+
+    # Check payload details
+    count_broadcasts = [item[2] for item in broadcasted_events if item[1] == "count"]
+    assert count_broadcasts[0]["rate_per_min"] == 95.0
+    assert count_broadcasts[0]["status"] == "CRITICAL"
+    assert count_broadcasts[0]["total_today"] >= 95
+
+    health_broadcasts = [item[2] for item in broadcasted_events if item[1] == "health"]
+    assert health_broadcasts[0]["fps"] == 0.0
+    assert health_broadcasts[0]["status"] == "OFFLINE"
+
