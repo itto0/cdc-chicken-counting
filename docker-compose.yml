@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///data/api_central.db
+    volumes:
+      - api_data:/data
+
+  counter:
+    build:
+      context: .
+      dockerfile: services/counter/Dockerfile
+    environment:
+      - API_SYNC_URL=http://api:8000/api/v1/sync/batch
+      - LINE_ID=lineA
+    depends_on:
+      - api
+
+volumes:
+  api_data:
