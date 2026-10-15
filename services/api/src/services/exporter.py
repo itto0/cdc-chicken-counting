@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
+import re
 from typing import Any
 import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -33,7 +34,8 @@ class ExcelReportGenerator:
     def generate_line_report(self, line_id: str, records: list[dict[str, Any]]) -> bytes:
         wb = openpyxl.Workbook()
         ws = wb.active
-        safe_title = f"Report {line_id}"[:31]
+        clean_line_id = re.sub(r"[\\/*?:\[\]]", "_", str(line_id))
+        safe_title = f"Report {clean_line_id}"[:31]
         ws.title = safe_title
 
         # Header styling: Corporate dark navy fill, white bold text

@@ -101,7 +101,8 @@ def test_export_endpoint_default_empty(setup_test_db):
 
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    assert "attachment; filename=report_lineA.xlsx" in resp.headers["content-disposition"]
+    assert "report_lineA.xlsx" in resp.headers["content-disposition"]
+    assert "attachment" in resp.headers["content-disposition"]
 
     wb = openpyxl.load_workbook(BytesIO(resp.content))
     ws = wb["Report lineA"]

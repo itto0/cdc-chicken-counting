@@ -67,5 +67,5 @@ def export_report(
     return Response(
         content=xlsx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=report_{line_id}.xlsx"},
+        headers={"Content-Disposition": f'attachment; filename="report_{line_id}.xlsx"'},
     )
