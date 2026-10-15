@@ -102,8 +102,10 @@ def broadcast_line_update(line_id: str, event_type: str, data: Any) -> Awaitable
 
 def format_sse(event: str, data: Any, event_id: str | int | None = None) -> str:
     """Format a Server-Sent Event message."""
-    if isinstance(data, (dict, list)):
-        payload = json.dumps(data)
+    if hasattr(data, "model_dump"):
+        payload = json.dumps(data.model_dump(mode="json"), default=str)
+    elif isinstance(data, (dict, list)):
+        payload = json.dumps(data, default=str)
     else:
         payload = str(data)
     msg = f"event: {event}\ndata: {payload}\n"
