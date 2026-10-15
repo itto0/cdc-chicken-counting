@@ -44,7 +44,7 @@ def run_benchmark(num_frames: int = 300) -> dict[str, Any]:
             break
 
         detections = detector.predict(frame)
-        counter.update(detections, timestamp=f_start)
+        counter.update(detections, timestamp=time.time())
         latencies.append((time.perf_counter() - f_start) * 1000.0)
 
     total_time = time.perf_counter() - start_time

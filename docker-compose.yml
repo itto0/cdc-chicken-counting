@@ -8,7 +8,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///data/api_central.db
+      - DATABASE_URL=sqlite:////data/api_central.db
     volumes:
       - api_data:/data
 

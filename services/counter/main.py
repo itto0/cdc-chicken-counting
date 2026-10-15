@@ -130,7 +130,7 @@ class CounterService:
                 detections = self.detector.predict(frame)
 
                 # 2. Track & Count
-                events = self.counter.update(detections, timestamp=frame_start)
+                events = self.counter.update(detections, timestamp=time.time())
 
                 # 3. LocalStorage Outbox
                 for ev in events:
