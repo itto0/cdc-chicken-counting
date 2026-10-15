@@ -13,4 +13,4 @@ dependencies = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["tests", "services/counter/tests"]
+testpaths = ["tests", "services/counter/tests", "services/api/tests"]
