@@ -85,7 +85,7 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     : `${base}${normalizedEndpoint}`;
 
   const headers = new Headers(options.headers || {});
-  if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
+  if (options.body && !headers.has("Content-Type") && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
   if (!headers.has("Accept")) {
@@ -239,11 +239,9 @@ export function getExportUrl(
   params.append("format", format);
   if (fromTime) {
     params.append("start_time", fromTime);
-    params.append("from", fromTime);
   }
   if (toTime) {
     params.append("end_time", toTime);
-    params.append("to", toTime);
   }
   return `${base}/api/v1/reports/export?${params.toString()}`;
 }

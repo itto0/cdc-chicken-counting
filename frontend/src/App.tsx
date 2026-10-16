@@ -41,9 +41,9 @@ function DashboardContent() {
     avg_rate_per_min: 118,
     target: currentLine?.daily_target ?? 62000,
     attainment_pct:
-      currentLine && currentLine.daily_target > 0 && currentLine.total_today > 0
-        ? Math.round(((currentLine.total_today) / currentLine.daily_target) * 1000) / 10
-        : 77.9,
+      currentLine && currentLine.daily_target > 0
+        ? Math.round(((currentLine.total_today || 0) / currentLine.daily_target) * 1000) / 10
+        : 0.0,
     camera_status: currentLine?.status ?? "online",
     detection_confidence_pct: 98.4,
   };
@@ -92,7 +92,7 @@ function DashboardContent() {
               aria-label="Select Production Line"
               value={currentLineId}
               onChange={(e) => setLineId(e.target.value)}
-              className="bg-slate-700 hover:bg-slate-650 border border-slate-600 text-slate-100 text-xs sm:text-sm rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer transition font-medium"
+              className="bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-100 text-xs sm:text-sm rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer transition font-medium"
             >
               {lines.map((line) => (
                 <option key={line.id} value={line.id} className="bg-slate-800 text-slate-100">

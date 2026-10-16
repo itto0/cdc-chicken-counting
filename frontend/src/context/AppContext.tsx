@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import type { ReactNode } from "react";
@@ -73,15 +74,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     refreshLines();
   }, [refreshLines]);
 
-  const value: AppContextType = {
-    currentLineId,
-    setLineId,
-    currentRole,
-    setRole,
-    lines,
-    isConnected,
-    refreshLines,
-  };
+  const value: AppContextType = useMemo(
+    () => ({
+      currentLineId,
+      setLineId,
+      currentRole,
+      setRole,
+      lines,
+      isConnected,
+      refreshLines,
+    }),
+    [currentLineId, currentRole, lines, isConnected, refreshLines]
+  );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
