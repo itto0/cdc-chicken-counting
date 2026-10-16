@@ -11,6 +11,7 @@ export interface LiveStreamState {
   latencyMs: number;
   streamState: string;
   totalToday: number;
+  countTick: number;
   reconnect: () => void;
 }
 
@@ -22,6 +23,7 @@ export function useLiveStream(lineId: string): LiveStreamState {
   const [latencyMs, setLatencyMs] = useState<number>(0);
   const [streamState, setStreamState] = useState<string>("OFFLINE");
   const [totalToday, setTotalToday] = useState<number>(0);
+  const [countTick, setCountTick] = useState<number>(0);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -125,7 +127,7 @@ export function useLiveStream(lineId: string): LiveStreamState {
         if (data.status) {
           setStreamState(String(data.status));
         }
-        if (typeof data.total_today === "number") {
+        if (typeof data.total_today === "number" && data.total_today > 0) {
           setTotalToday(data.total_today);
         }
       }
@@ -146,6 +148,7 @@ export function useLiveStream(lineId: string): LiveStreamState {
         }
         const timeVal = data.ts_utc || data.timestamp || new Date().toISOString();
         setLastCountTime(timeVal);
+        setCountTick((c) => c + 1);
       }
     });
 
@@ -165,6 +168,7 @@ export function useLiveStream(lineId: string): LiveStreamState {
         if (data.window_end || data.ts_utc) {
           setLastCountTime(data.window_end || data.ts_utc);
         }
+        setCountTick((c) => c + 1);
       }
     });
 
@@ -238,6 +242,7 @@ export function useLiveStream(lineId: string): LiveStreamState {
     setFps(0);
     setLatencyMs(0);
     setTotalToday(0);
+    setCountTick(0);
     connect();
 
     return () => {
@@ -254,6 +259,7 @@ export function useLiveStream(lineId: string): LiveStreamState {
     latencyMs,
     streamState,
     totalToday,
+    countTick,
     reconnect,
   };
 }

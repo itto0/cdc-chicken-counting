@@ -171,7 +171,7 @@ function DashboardContent() {
                 Dashboard Operasional & Pemantauan Kuota
               </span>
             </div>
-            <OverviewView summary={summary} />
+            <OverviewView summary={summary} onNavigateTab={setActiveTab} />
           </div>
         ) : activeTab === "live" ? (
           <div>
