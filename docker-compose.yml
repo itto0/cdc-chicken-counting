@@ -11,8 +11,10 @@ services:
       - "${PORT:-8070}:${PORT:-8070}"
     environment:
       - DATABASE_URL=sqlite:////data/api_central.db
+      - VIDEO_PATH=/samples/Rekaman_2.MOV
     volumes:
       - api_data:/data
+      - ./samples:/samples:ro
 
   counter:
     build:
@@ -26,6 +28,8 @@ services:
       - DB_PATH=/data/counter_outbox.db
       - VIDEO_PATH=/samples/Rekaman_2.MOV
       - LOOP_VIDEO=1
+      - LINE_DIRECTION=right
+      - TARGET_FPS=30.0
     volumes:
       - counter_data:/data
       - ./samples:/samples:ro
