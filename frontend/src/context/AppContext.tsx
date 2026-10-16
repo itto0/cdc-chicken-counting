@@ -7,8 +7,8 @@ import React, {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import type { LineItem, UserRole } from "../types";
-import { getLines } from "../services/apiClient";
+import type { LineItem, UserRole } from "@/types";
+import { http } from "@/lib/http";
 
 export interface AppContextType {
   currentLineId: string;
@@ -50,7 +50,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
 
   const refreshLines = useCallback(async () => {
     try {
-      const data = await getLines();
+      const data = await http<LineItem[]>("/api/v1/lines");
       if (Array.isArray(data) && data.length > 0) {
         setLines(data);
         setIsConnected(true);
@@ -63,7 +63,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         setLines([FALLBACK_MOCK_LINE]);
         setIsConnected(false);
       }
-    } catch (err) {
+    } catch {
       // In local development or offline mode, fall back to mock line gracefully
       setLines([FALLBACK_MOCK_LINE]);
       setIsConnected(false);
