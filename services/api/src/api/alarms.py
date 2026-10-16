@@ -91,13 +91,25 @@ def patch_alarm(
     if target_status == "ACKNOWLEDGED":
         alarm.status = "ACKNOWLEDGED"
         alarm.ack_at = now
+        note_parts = []
         if payload.notes:
-            alarm.message = f"{alarm.message} [Ack Note: {payload.notes}]"
+            note_parts.append(payload.notes)
+        if payload.acknowledged_by:
+            note_parts.append(f"by {payload.acknowledged_by}")
+        if note_parts:
+            base_msg = alarm.message or ""
+            alarm.message = f"{base_msg} [Ack Note: {' '.join(note_parts)}]"[:255]
     elif target_status == "RESOLVED":
         alarm.status = "RESOLVED"
         alarm.resolved_at = now
+        note_parts = []
         if payload.notes:
-            alarm.message = f"{alarm.message} [Resolution: {payload.notes}]"
+            note_parts.append(payload.notes)
+        if payload.acknowledged_by:
+            note_parts.append(f"by {payload.acknowledged_by}")
+        if note_parts:
+            base_msg = alarm.message or ""
+            alarm.message = f"{base_msg} [Resolution: {' '.join(note_parts)}]"[:255]
     else:
         raise HTTPException(status_code=400, detail=f"Invalid target status: {target_status}")
 

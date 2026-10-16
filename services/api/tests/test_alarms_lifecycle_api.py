@@ -155,3 +155,91 @@ def test_patch_alarm_invalid_status(alarms_client):
     )
     assert res.status_code == 400
     assert res.json()["detail"] == "Invalid target status: CANCELLED"
+
+
+def test_list_alarms_unfiltered_no_params(alarms_client):
+    """GET /api/v1/alarms with NO query parameters returns all alarms ordered newest first."""
+    response = alarms_client.get("/api/v1/alarms")
+    assert response.status_code == 200
+    alarms = response.json()
+    assert len(alarms) == 2
+    assert alarms[0]["id"] == 2
+    assert alarms[0]["message"] == "Camera stream offline"
+    assert alarms[1]["id"] == 1
+    assert alarms[1]["message"] == "Slow conveyor"
+
+
+def test_resolve_without_notes_does_not_append_none(alarms_client):
+    """PATCH with status=RESOLVED and no notes does not append notes or 'None'."""
+    # Omitted notes field
+    resolve_res = alarms_client.patch(
+        "/api/v1/alarms/2",
+        json={"status": "RESOLVED"},
+    )
+    assert resolve_res.status_code == 200
+    data = resolve_res.json()
+    assert data["status"] == "RESOLVED"
+    assert data["resolved_at"] is not None
+    assert data["message"] == "Camera stream offline"
+    assert "None" not in data["message"]
+    assert "Resolution" not in data["message"]
+
+    # Explicit notes=None
+    resolve_none = alarms_client.patch(
+        "/api/v1/alarms/1",
+        json={"status": "RESOLVED", "notes": None},
+    )
+    assert resolve_none.status_code == 200
+    data_none = resolve_none.json()
+    assert data_none["status"] == "RESOLVED"
+    assert data_none["resolved_at"] is not None
+    assert data_none["message"] == "Slow conveyor"
+    assert "None" not in data_none["message"]
+    assert "Resolution" not in data_none["message"]
+
+
+def test_alarm_note_truncation_and_operator_attribution(alarms_client):
+    """Verify operator attribution is included and long note is truncated to <= 255 chars."""
+    # 1. Verify operator attribution (acknowledged_by) is included in audit note
+    ack_res = alarms_client.patch(
+        "/api/v1/alarms/1",
+        json={
+            "status": "ACKNOWLEDGED",
+            "acknowledged_by": "operator_jane",
+            "notes": "Checking sensor calibration",
+        },
+    )
+    assert ack_res.status_code == 200
+    data = ack_res.json()
+    assert data["status"] == "ACKNOWLEDGED"
+    assert "by operator_jane" in data["message"]
+    assert "Checking sensor calibration" in data["message"]
+    assert "[Ack Note: Checking sensor calibration by operator_jane]" in data["message"]
+    assert len(data["message"]) <= 255
+
+    # 2. Verify operator attribution when notes is omitted
+    ack_op_only = alarms_client.patch(
+        "/api/v1/alarms/2",
+        json={
+            "status": "ACKNOWLEDGED",
+            "acknowledged_by": "operator_tom",
+        },
+    )
+    assert ack_op_only.status_code == 200
+    assert "[Ack Note: by operator_tom]" in ack_op_only.json()["message"]
+
+    # 3. Verify long note truncation to <= 255 chars preventing DB constraint violations
+    long_note = "A" * 300
+    res_long = alarms_client.patch(
+        "/api/v1/alarms/2",
+        json={
+            "status": "RESOLVED",
+            "acknowledged_by": "operator_bob",
+            "notes": long_note,
+        },
+    )
+    assert res_long.status_code == 200
+    data_long = res_long.json()
+    assert data_long["status"] == "RESOLVED"
+    assert len(data_long["message"]) <= 255
+    assert len(data_long["message"]) == 255
