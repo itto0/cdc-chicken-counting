@@ -15,6 +15,7 @@ import { OverviewView } from "./components/OverviewView";
 import { LiveStreamView } from "./components/views/LiveStreamView";
 import { AlarmsView } from "./components/views/AlarmsView";
 import { ReportsView } from "./components/views/ReportsView";
+import { SettingsView } from "./components/views/SettingsView";
 
 interface NavTab {
   key: TabKey;
@@ -216,6 +217,20 @@ function DashboardContent() {
               </div>
             </div>
             <ReportsView lineId={currentLineId} />
+          </div>
+        ) : activeTab === "settings" ? (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-slate-100">
+                  Pengaturan Jalur & Matriks Hak Akses
+                </h2>
+                <span className="text-xs text-slate-400">
+                  Konfigurasi parameter produksi, batas ambang kecepatan konveyor, dan wewenang pengguna
+                </span>
+              </div>
+            </div>
+            <SettingsView lineId={currentLineId} />
           </div>
         ) : (
           <div>
