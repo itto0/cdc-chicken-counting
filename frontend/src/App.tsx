@@ -13,6 +13,7 @@ import type { TabKey, UserRole, LineSummary } from "./types";
 import { AppProvider, useAppContext } from "./context/AppContext";
 import { OverviewView } from "./components/OverviewView";
 import { LiveStreamView } from "./components/views/LiveStreamView";
+import { AlarmsView } from "./components/views/AlarmsView";
 
 interface NavTab {
   key: TabKey;
@@ -186,6 +187,20 @@ function DashboardContent() {
               </div>
             </div>
             <LiveStreamView />
+          </div>
+        ) : activeTab === "alarms" ? (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-slate-100">
+                  Manajemen Alarm & Insiden
+                </h2>
+                <span className="text-xs text-slate-400">
+                  Pemantauan status bahaya, pengakuan insiden, dan catatan penyelesaian operasional
+                </span>
+              </div>
+            </div>
+            <AlarmsView />
           </div>
         ) : (
           <div>
