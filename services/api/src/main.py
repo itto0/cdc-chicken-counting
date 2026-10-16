@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from services.api.src.api.lines import router as lines_router
 from services.api.src.api.live import router as live_router
 from services.api.src.api.reports import router as reports_router
+from services.api.src.api.summary import router as summary_router
 from services.api.src.api.sync import router as sync_router
 from services.api.src.db.models import Base
 from services.api.src.db.session import engine
@@ -28,6 +29,7 @@ app = FastAPI(
 app.include_router(sync_router)
 app.include_router(live_router)
 app.include_router(reports_router)
+app.include_router(summary_router)
 app.include_router(lines_router)
 
 
