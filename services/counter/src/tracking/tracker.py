@@ -141,7 +141,7 @@ class ChickenCounter:
         events: list[CountEventDTO] = []
 
         # Find closest track-detection pairs within max_distance
-        candidates: list[tuple[float, int, int]] = []
+        candidates: list[tuple[int, float, int, int]] = []
         for track_id, track in self.tracks.items():
             for det_idx, det in enumerate(detections):
                 anchor = det.anchor_bottom_center
@@ -150,15 +150,16 @@ class ChickenCounter:
                     + (track.current_anchor[1] - anchor[1]) ** 2
                 ) ** 0.5
                 if dist <= self.max_distance:
-                    candidates.append((dist, track_id, det_idx))
+                    # Prioritize active tracks (missed_frames == 0) over stale tracks (missed_frames > 0)
+                    candidates.append((track.missed_frames, dist, track_id, det_idx))
 
-        candidates.sort(key=lambda item: item[0])
+        candidates.sort(key=lambda item: (item[0], item[1]))
 
         matched_track_ids: set[int] = set()
         matched_det_indices: set[int] = set()
         matches: list[tuple[int, int]] = []
 
-        for dist, track_id, det_idx in candidates:
+        for _, dist, track_id, det_idx in candidates:
             if track_id not in matched_track_ids and det_idx not in matched_det_indices:
                 matched_track_ids.add(track_id)
                 matched_det_indices.add(det_idx)
@@ -211,7 +212,8 @@ class ChickenCounter:
             if track_id not in matched_track_ids and track_id not in newly_created_ids:
                 track.missed_frames += 1
                 track.age += 1
-                if track.missed_frames > self.max_age:
+                max_allowed_missed = min(self.max_age, 3) if track.counted else self.max_age
+                if track.missed_frames > max_allowed_missed:
                     stale_ids.append(track_id)
 
         for track_id in stale_ids:

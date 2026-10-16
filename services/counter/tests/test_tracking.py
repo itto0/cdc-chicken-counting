@@ -536,3 +536,54 @@ def test_empty_shackle_not_counted_during_tracking():
     # Verify no count happened around frame 3078
     assert not any(3070 <= f <= 3085 for f in counted_frames)
 
+
+def test_active_track_priority_prevents_stale_track_theft():
+    """Verify active tracks take precedence over stale tracks even if the stale track is closer."""
+    # Line zone at x=300 moving right
+    line_zone = VirtualLineZone(start=(300.0, 50.0), end=(300.0, 450.0), direction="right")
+    counter = ChickenCounter(line_zone=line_zone, line_id="lineA", max_distance=60.0)
+
+    # Frame 1: Chicken 1 at 290, Chicken 2 at 190
+    counter.update([
+        Detection(x1=270, y1=100, x2=310, y2=200, confidence=0.9, class_id=0, class_name="chicken"),
+        Detection(x1=170, y1=100, x2=210, y2=200, confidence=0.9, class_id=0, class_name="chicken"),
+    ])
+    assert 1 in counter.tracks and 2 in counter.tracks
+
+    # Frame 2: Chicken 1 crosses to 310 (counted!), Chicken 2 moves to 220
+    events1 = counter.update([
+        Detection(x1=290, y1=100, x2=330, y2=200, confidence=0.9, class_id=0, class_name="chicken"),
+        Detection(x1=200, y1=100, x2=240, y2=200, confidence=0.9, class_id=0, class_name="chicken"),
+    ])
+    assert len(events1) == 1
+    assert counter.tracks[1].counted is True
+
+    # Frame 3: Chicken 1 is missed! Chicken 2 moves to 250
+    counter.update([
+        Detection(x1=230, y1=100, x2=270, y2=200, confidence=0.9, class_id=0, class_name="chicken"),
+    ])
+    assert counter.tracks[2].current_anchor == (250.0, 200.0)
+    assert counter.tracks[2].missed_frames == 0
+    assert counter.tracks[1].missed_frames == 1
+
+    # Frame 4: Chicken 2 moves to 280. Chicken 1 still missed at 310 (missed_frames=2)
+    counter.update([
+        Detection(x1=260, y1=100, x2=300, y2=200, confidence=0.9, class_id=0, class_name="chicken"),
+    ])
+    assert counter.tracks[2].current_anchor == (280.0, 200.0)
+    assert counter.tracks[1].missed_frames == 2
+
+    # Frame 5: Chicken 2 moves to 308 (crosses line!).
+    # Distance to Chicken 1 (at 310) is only 2px!
+    # Distance to Chicken 2 (at 280) is 28px!
+    # Under old logic, stale Track 1 (dist 2px) stole the detection and Chicken 2 was never counted.
+    # Under active track priority, active Track 2 gets the detection and is counted!
+    events2 = counter.update([
+        Detection(x1=288, y1=100, x2=328, y2=200, confidence=0.9, class_id=0, class_name="chicken"),
+    ])
+    assert len(events2) == 1
+    assert events2[0].track_id == 2
+    assert counter.total_count == 2
+    assert counter.tracks[2].counted is True
+
+

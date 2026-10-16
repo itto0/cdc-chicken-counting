@@ -417,3 +417,34 @@ def test_shackle_detector_video_frame_rejects_empty_shackle():
     assert len(occupied_right) == 1
 
 
+def test_shackle_detector_noise_rejection_and_bracket_clustering():
+    """Verify ShackleDetector groups paired bracket bars accurately without cascading into noise."""
+    detector = ShackleDetector(
+        shackle_y_ratio=(0.20, 0.50),
+        min_spacing=55.0,
+        chicken_width=80.0,
+        chicken_height=300.0,
+        chicken_y_top=250.0,
+        occupancy_check=False,
+    )
+    frame = np.zeros((600, 800, 3), dtype=np.uint8)
+
+    # Shackle bracket 1 at cx=300: two vertical bars at 292 and 308 (intensity 255)
+    frame[150:280, 290:294] = 255
+    frame[150:280, 306:310] = 255
+
+    # Faint noise reflection nearby at x=345 (intensity 50, below 40% of max energy)
+    frame[150:280, 344:346] = 50
+
+    # Shackle bracket 2 at cx=500: two vertical bars at 492 and 508
+    frame[150:280, 490:494] = 255
+    frame[150:280, 506:510] = 255
+
+    detections = detector.predict(frame)
+    assert len(detections) == 2
+    centers = [(d.x1 + d.x2) / 2.0 for d in detections]
+    assert pytest.approx(centers[0], abs=5) == 300.0
+    assert pytest.approx(centers[1], abs=5) == 500.0
+
+
+

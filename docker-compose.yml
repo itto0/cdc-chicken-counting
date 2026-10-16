@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: services/api/Dockerfile
     ports:
-      - "8000:8000"
+      - "${PORT:-8070}:${PORT:-8070}"
     environment:
       - DATABASE_URL=sqlite:////data/api_central.db
     volumes:
@@ -17,7 +17,7 @@ services:
       context: .
       dockerfile: services/counter/Dockerfile
     environment:
-      - API_SYNC_URL=http://api:8000/api/v1/sync/batch
+      - API_SYNC_URL=http://api:${PORT:-8070}/api/v1/sync/batch
       - LINE_ID=lineA
       - DB_PATH=/data/counter_outbox.db
     volumes:

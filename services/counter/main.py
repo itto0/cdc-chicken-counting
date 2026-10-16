@@ -314,7 +314,7 @@ class CounterService:
                         mid_y = float(vh // 2)
                         self.counter.line_zone.start = (0.0, mid_y)
                         self.counter.line_zone.end = (float(vw), mid_y)
-                    self.counter.max_distance = max(60.0, float(vw) * 0.05)
+                    self.counter.max_distance = min(60.0, max(35.0, float(vw) * 0.03))
             except Exception:
                 pass
 
@@ -364,7 +364,7 @@ class CounterService:
                             mid_y = float(h // 2)
                             self.counter.line_zone.start = (0.0, mid_y)
                             self.counter.line_zone.end = (float(w), mid_y)
-                        self.counter.max_distance = max(60.0, float(w) * 0.05)
+                        self.counter.max_distance = min(60.0, max(35.0, float(w) * 0.03))
 
                 # 1. Detect
                 t0 = time.perf_counter()

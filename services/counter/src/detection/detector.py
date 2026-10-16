@@ -161,6 +161,8 @@ class ShackleDetector(Detector):
         occupancy_check: bool = True,
         carcass_y_ratio: tuple[float, float] = (0.62, 0.76),
         occupancy_threshold: float = 4.5,
+        min_peak_energy: float = 12.0,
+        max_bar_spacing: float = 25.0,
     ) -> None:
         self.min_confidence = min_confidence
         self.shackle_y_ratio = shackle_y_ratio
@@ -174,6 +176,8 @@ class ShackleDetector(Detector):
         self.occupancy_check = occupancy_check
         self.carcass_y_ratio = carcass_y_ratio
         self.occupancy_threshold = occupancy_threshold
+        self.min_peak_energy = min_peak_energy
+        self.max_bar_spacing = max_bar_spacing
 
     def predict(self, frame: np.ndarray) -> list[Detection]:
         """Detect individual chickens on the shackle line with regular spacing."""
@@ -198,25 +202,52 @@ class ShackleDetector(Detector):
             sobelx.mean(axis=0).reshape(1, -1), (25, 1), 0
         ).flatten()
 
-        threshold = max(12.0, float(col_energy.mean() * 0.8))
-        peaks: list[int] = []
-        for i in range(1, len(col_energy) - 1):
-            if (
-                col_energy[i] > col_energy[i - 1]
-                and col_energy[i] > col_energy[i + 1]
-                and col_energy[i] > threshold
-            ):
-                peaks.append(i)
+        max_energy = float(col_energy.max()) if len(col_energy) > 0 else 0.0
+        if max_energy < 10.0:
+            return detections
 
-        # Merge peaks closer than min_spacing (since a shackle bracket has 2 vertical bars)
-        centers: list[int] = []
-        for p in peaks:
-            if not centers:
-                centers.append(p)
-            elif (p - centers[-1]) < self.min_spacing:
-                centers[-1] = (centers[-1] + p) // 2
+        threshold = max(self.min_peak_energy, float(max_energy * 0.40))
+        peaks: list[tuple[int, float]] = []
+        i = 1
+        n = len(col_energy)
+        while i < n - 1:
+            if col_energy[i] >= threshold and col_energy[i] > col_energy[i - 1]:
+                start = i
+                while i < n - 1 and col_energy[i] == col_energy[i + 1]:
+                    i += 1
+                if i < n - 1 and col_energy[i] > col_energy[i + 1]:
+                    peak_pos = (start + i) // 2
+                    peaks.append((peak_pos, float(col_energy[start])))
+            i += 1
+
+        # Cluster paired bracket bars (separated by <= max_bar_spacing)
+        clusters: list[list[tuple[int, float]]] = []
+        for p, val in peaks:
+            if not clusters:
+                clusters.append([(p, val)])
+            elif (p - clusters[-1][-1][0]) <= self.max_bar_spacing:
+                clusters[-1].append((p, val))
             else:
-                centers.append(p)
+                clusters.append([(p, val)])
+
+        cluster_info: list[tuple[int, float]] = []
+        for c in clusters:
+            cx = int(np.mean([pt[0] for pt in c]))
+            max_val = max(pt[1] for pt in c)
+            cluster_info.append((cx, max_val))
+
+        # Filter clusters closer than min_spacing (retain stronger bracket candidate)
+        filtered_centers: list[tuple[int, float]] = []
+        for cx, val in cluster_info:
+            if not filtered_centers:
+                filtered_centers.append((cx, val))
+            elif (cx - filtered_centers[-1][0]) < self.min_spacing:
+                if val > filtered_centers[-1][1]:
+                    filtered_centers[-1] = (cx, val)
+            else:
+                filtered_centers.append((cx, val))
+
+        centers = [c[0] for c in filtered_centers]
 
         y_top = (
             self.chicken_y_top
