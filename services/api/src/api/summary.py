@@ -28,7 +28,7 @@ class LineSummaryResponse(BaseModel):
 @router.get("/{line_id}/summary", response_model=LineSummaryResponse)
 def get_line_summary(
     line_id: str,
-    period: str = Query(default="today"),
+    period: str = Query(default="today", pattern="^(today|shift|week)$"),
     db: Session = Depends(get_db),
 ):
     line = db.get(Line, line_id)
@@ -37,13 +37,13 @@ def get_line_summary(
 
     now = datetime.now(timezone.utc)
     if period == "today":
-        start_time = datetime(now.year, now.month, now.day)
+        start_time = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
     elif period == "shift":
         start_time = now - timedelta(hours=8)
     elif period == "week":
         start_time = now - timedelta(days=7)
     else:
-        start_time = datetime(now.year, now.month, now.day)
+        start_time = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
 
     # Total count in period
     total_count = db.scalar(
@@ -86,7 +86,7 @@ def get_line_summary(
         ts = latest_health.timestamp
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
-        if now - ts <= timedelta(seconds=60):
+        if 0 <= (now - ts).total_seconds() <= 60:
             camera_status = latest_health.stream_state.lower()
         fps = round(latest_health.fps, 1)
         latency = round(latest_health.latency_p95_ms, 1)
