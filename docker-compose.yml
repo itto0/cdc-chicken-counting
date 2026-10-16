@@ -22,10 +22,14 @@ services:
       - .env
     environment:
       - API_SYNC_URL=http://api:${PORT:-8070}/api/v1/sync/batch
-      - LINE_ID=lineA
+      - LINE_ID=line-1
       - DB_PATH=/data/counter_outbox.db
+      - VIDEO_PATH=/samples/Rekaman_2.MOV
+      - LOOP_VIDEO=1
     volumes:
       - counter_data:/data
+      - ./samples:/samples:ro
+    restart: unless-stopped
     depends_on:
       - api
 

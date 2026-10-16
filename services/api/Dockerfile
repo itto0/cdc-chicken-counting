@@ -14,7 +14,12 @@ RUN pip install --no-cache-dir \
     "sqlalchemy>=2.0.0" \
     "pydantic>=2.5.0" \
     "httpx>=0.27.0" \
-    "openpyxl>=3.1.0"
+    "openpyxl>=3.1.0" \
+    "PyJWT>=2.8.0" \
+    "python-dotenv>=1.0.0" \
+    "reportlab>=4.0.0" \
+    "opencv-python-headless>=4.8.0" \
+    "numpy>=1.24.0"
 
 # Copy shared code and service code
 COPY shared /app/shared
@@ -25,7 +30,8 @@ RUN mkdir -p /data /app/data
 
 ENV PYTHONPATH=/app
 ENV DATABASE_URL=sqlite:////data/api_central.db
+ENV PORT=8070
 
-EXPOSE 8000
+EXPOSE 8070
 
-CMD ["uvicorn", "services.api.src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn services.api.src.main:app --host 0.0.0.0 --port ${PORT:-8070}"]

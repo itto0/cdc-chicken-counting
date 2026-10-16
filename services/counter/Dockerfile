@@ -12,7 +12,8 @@ RUN pip install --no-cache-dir \
     "opencv-python-headless>=4.8.0" \
     "numpy>=1.24.0" \
     "pydantic>=2.5.0" \
-    "httpx>=0.27.0"
+    "httpx>=0.27.0" \
+    "python-dotenv>=1.0.0"
 
 # Copy shared code and service code
 COPY shared /app/shared
