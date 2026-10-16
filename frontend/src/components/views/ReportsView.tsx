@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import ReactECharts from "echarts-for-react";
 import {
   Calendar,
@@ -229,6 +229,16 @@ export function ReportsView({ lineId }: ReportsViewProps) {
   const [isFallback, setIsFallback] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<"xlsx" | "pdf" | null>(null);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+  const exportFeedbackTimeoutRef = useRef<NodeJS.Timeout | number | null>(null);
+
+  // Clear export feedback timer on unmount
+  useEffect(() => {
+    return () => {
+      if (exportFeedbackTimeoutRef.current) {
+        clearTimeout(exportFeedbackTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Recompute date range whenever preset changes
   useEffect(() => {
@@ -236,6 +246,11 @@ export function ReportsView({ lineId }: ReportsViewProps) {
     setDateRange(newRange);
     setCurrentPage(1);
   }, [preset]);
+
+  // Reset pagination when activeLineId changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeLineId]);
 
   // Fetch count aggregates and raw events
   const fetchData = useCallback(
@@ -254,7 +269,7 @@ export function ReportsView({ lineId }: ReportsViewProps) {
           granularity,
         });
 
-        if (response && Array.isArray(response.aggregates) && response.aggregates.length > 0) {
+        if (response && Array.isArray(response.aggregates)) {
           setAggregates(response.aggregates);
           setEvents(response.events || []);
           setPaginationMeta(
@@ -265,9 +280,6 @@ export function ReportsView({ lineId }: ReportsViewProps) {
             }
           );
           setIsFallback(false);
-        } else {
-          // Empty aggregates from API, fallback to realistic mock
-          applyMockFallback(preset, pageToLoad);
         }
       } catch (err) {
         console.warn("Failed to fetch reports counts from API, falling back to mock data:", err);
@@ -321,6 +333,11 @@ export function ReportsView({ lineId }: ReportsViewProps) {
 
   // Export report download handler
   const handleExport = (format: "xlsx" | "pdf") => {
+    if (exportFeedbackTimeoutRef.current) {
+      clearTimeout(exportFeedbackTimeoutRef.current);
+      exportFeedbackTimeoutRef.current = null;
+    }
+
     setIsExporting(format);
     try {
       const url = apiClient.getExportUrl(format, activeLineId, dateRange.from, dateRange.to);
@@ -337,18 +354,24 @@ export function ReportsView({ lineId }: ReportsViewProps) {
       setExportFeedback(
         `Laporan format ${format.toUpperCase()} berhasil diekspor untuk ${currentLine?.name || activeLineId}.`
       );
-      setTimeout(() => setExportFeedback(null), 4000);
+      exportFeedbackTimeoutRef.current = setTimeout(() => {
+        setExportFeedback(null);
+        exportFeedbackTimeoutRef.current = null;
+      }, 4000);
     } catch (err) {
       console.error(`Gagal mengekspor laporan ${format}:`, err);
       setExportFeedback(`Gagal mengekspor file ${format.toUpperCase()}.`);
-      setTimeout(() => setExportFeedback(null), 4000);
+      exportFeedbackTimeoutRef.current = setTimeout(() => {
+        setExportFeedback(null);
+        exportFeedbackTimeoutRef.current = null;
+      }, 4000);
     } finally {
       setIsExporting(null);
     }
   };
 
   // Compute metric cards data
-  const { totalCount, avgSpeed, peakHour, totalIntervals } = useMemo(() => {
+  const summaryMetrics = useMemo(() => {
     if (!aggregates || aggregates.length === 0) {
       return {
         totalCount: 0,
@@ -369,8 +392,18 @@ export function ReportsView({ lineId }: ReportsViewProps) {
           )
         : 0;
 
-    let peak = aggregates[0];
-    for (const agg of aggregates) {
+    // If totalCount === 0 or all intervals have count === 0, return time: "-"
+    if (total === 0 || activeIntervals.length === 0) {
+      return {
+        totalCount: 0,
+        avgSpeed: 0,
+        peakHour: { time: "-", count: 0 },
+        totalIntervals: aggregates.length,
+      };
+    }
+
+    let peak = activeIntervals[0];
+    for (const agg of activeIntervals) {
       if ((agg.count || 0) > (peak.count || 0)) {
         peak = agg;
       }
@@ -392,6 +425,8 @@ export function ReportsView({ lineId }: ReportsViewProps) {
       totalIntervals: aggregates.length,
     };
   }, [aggregates, preset]);
+
+  const { totalCount, avgSpeed, peakHour, totalIntervals } = summaryMetrics;
 
   // Chart datasets
   const chartItems = useMemo(() => {
