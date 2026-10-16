@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from fastapi import FastAPI
+from services.api.src.api.counts import router as counts_router
 from services.api.src.api.lines import router as lines_router
 from services.api.src.api.live import router as live_router
 from services.api.src.api.reports import router as reports_router
@@ -30,6 +31,7 @@ app.include_router(sync_router)
 app.include_router(live_router)
 app.include_router(reports_router)
 app.include_router(summary_router)
+app.include_router(counts_router)
 app.include_router(lines_router)
 
 
