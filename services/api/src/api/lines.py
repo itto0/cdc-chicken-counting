@@ -1,7 +1,7 @@
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from services.api.src.db.models import Line, HealthSample, CountEvent
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/v1/lines", tags=["lines"])
 
 class LineUpdatePayload(BaseModel):
     name: Optional[str] = None
-    daily_target: Optional[int] = None
+    daily_target: Optional[int] = Field(None, gt=0)
     is_active: Optional[bool] = None
 
 
@@ -37,7 +37,7 @@ class LineDetailDTO(BaseModel):
 def list_lines(db: Session = Depends(get_db)):
     lines = db.scalars(select(Line)).all()
     now = datetime.now(timezone.utc)
-    today_start = datetime(now.year, now.month, now.day)
+    today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
 
     result = []
     for line in lines:

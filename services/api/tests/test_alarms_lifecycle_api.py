@@ -243,3 +243,37 @@ def test_alarm_note_truncation_and_operator_attribution(alarms_client):
     assert data_long["status"] == "RESOLVED"
     assert len(data_long["message"]) <= 255
     assert len(data_long["message"]) == 255
+
+
+def test_list_alarms_active_status_includes_open_and_acknowledged(alarms_client):
+    """Ensure status=ACTIVE filters for both OPEN and ACKNOWLEDGED, excluding RESOLVED."""
+    # Initially: alarm 1 is OPEN, alarm 2 is OPEN
+    # Acknowledge alarm 1
+    ack_res = alarms_client.patch(
+        "/api/v1/alarms/1",
+        json={"status": "ACKNOWLEDGED", "notes": "Investigating"},
+    )
+    assert ack_res.status_code == 200
+
+    # Query status=ACTIVE: should include alarm 2 (OPEN) and alarm 1 (ACKNOWLEDGED)
+    res_active = alarms_client.get("/api/v1/alarms?status=ACTIVE")
+    assert res_active.status_code == 200
+    active_alarms = res_active.json()
+    assert len(active_alarms) == 2
+    active_statuses = {a["status"] for a in active_alarms}
+    assert active_statuses == {"OPEN", "ACKNOWLEDGED"}
+
+    # Resolve alarm 2
+    res_resolve = alarms_client.patch(
+        "/api/v1/alarms/2",
+        json={"status": "RESOLVED"},
+    )
+    assert res_resolve.status_code == 200
+
+    # Query status=active: should only include alarm 1 (ACKNOWLEDGED)
+    res_active_after = alarms_client.get("/api/v1/alarms?status=active")
+    assert res_active_after.status_code == 200
+    after_alarms = res_active_after.json()
+    assert len(after_alarms) == 1
+    assert after_alarms[0]["id"] == 1
+    assert after_alarms[0]["status"] == "ACKNOWLEDGED"

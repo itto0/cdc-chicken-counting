@@ -204,7 +204,7 @@ async def preview_stream(
                     break
                 if await request.is_disconnected():
                     break
-                jpeg_bytes = FrameGenerator.generate_jpeg_frame(line_id, frame_idx)
+                jpeg_bytes = await asyncio.to_thread(FrameGenerator.generate_jpeg_frame, line_id, frame_idx)
                 yield (
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n\r\n" + jpeg_bytes + b"\r\n"

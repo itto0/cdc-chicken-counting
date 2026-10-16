@@ -31,6 +31,9 @@ def auth_client():
     db.add(User(username="admin", password_hash=hash_password("admin123"), role="ADMIN", is_active=True))
     db.add(User(username="operator", password_hash=hash_password("op123"), role="OPERATOR", is_active=True))
     db.add(User(username="disabled", password_hash=hash_password("dis123"), role="OPERATOR", is_active=False))
+    # User with legacy unsalted SHA-256 hash for backwards compatibility testing
+    import hashlib
+    db.add(User(username="legacy_user", password_hash=hashlib.sha256(b"legacy123").hexdigest(), role="OPERATOR", is_active=True))
     db.commit()
     db.close()
 
@@ -173,12 +176,45 @@ def test_auth_me_inactive_user(auth_client):
     assert res.json()["detail"] == "User account is inactive"
 
 
+def test_login_legacy_unsalted_sha256_user(auth_client):
+    res = auth_client.post("/api/v1/auth/login", json={"username": "legacy_user", "password": "legacy123"})
+    assert res.status_code == 200
+    data = res.json()
+    assert "access_token" in data
+    assert data["user"]["username"] == "legacy_user"
+
+
 def test_hash_and_verify_password_unit():
+    import hashlib
     from services.api.src.services.auth import verify_password
-    hashed = hash_password("my-secret-pass")
-    assert hashed != "my-secret-pass"
-    assert verify_password("my-secret-pass", hashed) is True
+
+    pass1 = "my-secret-pass"
+    hashed = hash_password(pass1)
+    assert hashed != pass1
+    assert "$" in hashed
+    parts = hashed.split("$")
+    assert len(parts) == 2
+    salt, key = parts
+    assert len(salt) == 32
+    assert len(key) == 64
+
+    # Unique salts per invocation
+    hashed2 = hash_password(pass1)
+    assert hashed != hashed2
+
+    # Verification of salted PBKDF2
+    assert verify_password(pass1, hashed) is True
+    assert verify_password(pass1, hashed2) is True
     assert verify_password("wrong-pass", hashed) is False
+    assert verify_password("", hashed) is False
+    assert verify_password(pass1, "") is False
+    assert verify_password(pass1, "malformed$salt$extra") is False
+
+    # Backwards-compatible legacy unsalted SHA-256 verification
+    legacy_hash = hashlib.sha256(pass1.encode("utf-8")).hexdigest()
+    assert "$" not in legacy_hash
+    assert verify_password(pass1, legacy_hash) is True
+    assert verify_password("wrong-pass", legacy_hash) is False
 
 
 def test_decode_access_token_invalid_unit():

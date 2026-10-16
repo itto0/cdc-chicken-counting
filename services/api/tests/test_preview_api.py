@@ -77,3 +77,23 @@ async def test_mjpeg_preview_client_disconnect_handling():
     # Stream terminates when client disconnects
     assert len(chunks) == 1
     assert b"--frame" in chunks[0]
+
+
+@pytest.mark.asyncio
+async def test_mjpeg_preview_uses_asyncio_to_thread(monkeypatch):
+    import asyncio
+    called_in_thread = []
+    orig_to_thread = asyncio.to_thread
+
+    async def mock_to_thread(func, *args, **kwargs):
+        called_in_thread.append((func, args))
+        return await orig_to_thread(func, *args, **kwargs)
+
+    monkeypatch.setattr(asyncio, "to_thread", mock_to_thread)
+    req = AsyncMock()
+    req.is_disconnected = AsyncMock(side_effect=[False, True])
+    response = await preview_stream(line_id="line-test", request=req, max_frames=1)
+    async for _ in response.body_iterator:
+        pass
+    assert len(called_in_thread) >= 1
+    assert called_in_thread[0][0] == FrameGenerator.generate_jpeg_frame

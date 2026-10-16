@@ -79,7 +79,7 @@ def get_line_counts(
         agg_query = agg_query.where(CountAggregate.window_start >= f_dt)
     if t_dt is not None:
         agg_query = agg_query.where(CountAggregate.window_start <= t_dt)
-    agg_query = agg_query.order_by(CountAggregate.window_start.asc()).limit(100)
+    agg_query = agg_query.order_by(CountAggregate.window_start.asc()).limit(500)
     aggs = db.scalars(agg_query).all()
 
     aggregates_dto = [

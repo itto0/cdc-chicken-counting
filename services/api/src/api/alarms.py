@@ -51,8 +51,9 @@ def list_alarms(
     if status:
         stat = status.upper()
         if stat == "ACTIVE":
-            stat = "OPEN"
-        query = query.where(Alarm.status == stat)
+            query = query.where(Alarm.status.in_(["OPEN", "ACKNOWLEDGED"]))
+        else:
+            query = query.where(Alarm.status == stat)
     if severity:
         query = query.where(Alarm.severity == severity.upper())
 

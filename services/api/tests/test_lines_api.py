@@ -111,3 +111,17 @@ def test_update_nonexistent_line(lines_client):
     response = lines_client.put("/api/v1/lines/non-existent", json={"name": "Ghost"})
     assert response.status_code == 404
     assert response.json()["detail"] == "Line not found"
+
+
+def test_update_line_daily_target_validation(lines_client):
+    # daily_target <= 0 should fail validation with 422
+    res_zero = lines_client.put("/api/v1/lines/line-1", json={"daily_target": 0})
+    assert res_zero.status_code == 422
+
+    res_negative = lines_client.put("/api/v1/lines/line-1", json={"daily_target": -100})
+    assert res_negative.status_code == 422
+
+    # daily_target > 0 succeeds
+    res_valid = lines_client.put("/api/v1/lines/line-1", json={"daily_target": 90000})
+    assert res_valid.status_code == 200
+    assert res_valid.json()["daily_target"] == 90000

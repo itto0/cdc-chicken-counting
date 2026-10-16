@@ -41,6 +41,22 @@ def counts_client():
     db.add(CountEvent(id=102, line_id="line-tie", track_id=2, ts_utc=same_ts, confidence=0.99))
     db.add(CountEvent(id=103, line_id="line-tie", track_id=3, ts_utc=same_ts, confidence=0.99))
 
+    # Line for testing >100 aggregate buckets (e.g. 168 hours for 7 days)
+    db.add(Line(id="line-7day", name="Line 7 Day", daily_target=10000, is_active=True))
+    base_window = datetime(2026, 10, 1, 0, 0, 0, tzinfo=timezone.utc)
+    for h in range(168):
+        db.add(
+            CountAggregate(
+                line_id="line-7day",
+                window_start=base_window + timedelta(hours=h),
+                window_end=base_window + timedelta(hours=h + 1),
+                count=100 + h,
+                rate_per_min=1.5,
+                confidence_avg=0.99,
+                status="NORMAL",
+            )
+        )
+
     db.commit()
     db.close()
 
@@ -141,3 +157,13 @@ def test_get_line_counts_deterministic_tie_breaker_ordering(counts_client):
     assert len(events) == 3
     # Same ts_utc, ordered descending by id (103, 102, 101)
     assert [e["id"] for e in events] == [103, 102, 101]
+
+
+def test_get_line_counts_aggregates_supports_up_to_500_buckets(counts_client):
+    response = counts_client.get("/api/v1/lines/line-7day/counts")
+    assert response.status_code == 200
+    aggregates = response.json()["aggregates"]
+    # All 168 hourly buckets returned without 100-bucket truncation
+    assert len(aggregates) == 168
+    assert aggregates[0]["count"] == 100
+    assert aggregates[-1]["count"] == 267
