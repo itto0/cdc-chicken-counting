@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from services.api.src.db.models import CountAggregate
 from services.api.src.db.session import get_db
 from services.api.src.services.exporter import ExcelReportGenerator
+from services.api.src.services.pdf_exporter import PDFReportGenerator
 
 router = APIRouter(prefix="/api/v1/reports", tags=["reports"])
 
@@ -32,10 +33,11 @@ def export_report(
     end_time: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> Response:
-    if format.lower() != "xlsx":
+    fmt = format.lower()
+    if fmt not in ("xlsx", "pdf"):
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported format '{format}'. Only 'xlsx' is supported.",
+            detail=f"Unsupported format '{format}'. Only 'xlsx' and 'pdf' are supported.",
         )
 
     query = select(CountAggregate).where(CountAggregate.line_id == line_id)
@@ -60,6 +62,15 @@ def export_report(
         }
         for agg in aggregates
     ]
+
+    if fmt == "pdf":
+        pdf_generator = PDFReportGenerator()
+        pdf_bytes = pdf_generator.generate_line_report(line_id=line_id, records=records)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="report_{line_id}.pdf"'},
+        )
 
     generator = ExcelReportGenerator()
     xlsx_bytes = generator.generate_line_report(line_id=line_id, records=records)
