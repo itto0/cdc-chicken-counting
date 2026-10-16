@@ -12,6 +12,7 @@ import {
 import type { TabKey, UserRole, LineSummary } from "./types";
 import { AppProvider, useAppContext } from "./context/AppContext";
 import { OverviewView } from "./components/OverviewView";
+import { LiveStreamView } from "./components/views/LiveStreamView";
 
 interface NavTab {
   key: TabKey;
@@ -171,6 +172,20 @@ function DashboardContent() {
               </span>
             </div>
             <OverviewView summary={summary} />
+          </div>
+        ) : activeTab === "live" ? (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-slate-100">
+                  Umpan Video & Telemetri Langsung
+                </h2>
+                <span className="text-xs text-slate-400">
+                  Streaming MJPEG Kamera Real-time & Evaluator Kecepatan Konveyor
+                </span>
+              </div>
+            </div>
+            <LiveStreamView />
           </div>
         ) : (
           <div>
