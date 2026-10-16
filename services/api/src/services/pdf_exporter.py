@@ -1,3 +1,4 @@
+import html
 import io
 from datetime import datetime
 from typing import Any, Sequence
@@ -8,17 +9,8 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 
 class PDFReportGenerator:
-    def generate_line_report(self, line_id: str, records: Sequence[dict[str, Any]]) -> bytes:
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=letter,
-            rightMargin=36,
-            leftMargin=36,
-            topMargin=36,
-            bottomMargin=36,
-        )
-        elements = []
+    def _build_elements(self, line_id: str, records: Sequence[dict[str, Any]]) -> list[Any]:
+        elements: list[Any] = []
         styles = getSampleStyleSheet()
 
         title_style = ParagraphStyle(
@@ -29,9 +21,10 @@ class PDFReportGenerator:
             spaceAfter=12,
         )
         elements.append(Paragraph("Lihat.id Poultry Counter - Production Report", title_style))
+        escaped_line_id = html.escape(str(line_id))
         elements.append(
             Paragraph(
-                f"Line ID: <b>{line_id}</b> | Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                f"Line ID: <b>{escaped_line_id}</b> | Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
                 styles["Normal"],
             )
         )
@@ -88,7 +81,7 @@ class PDFReportGenerator:
                 ]
             )
 
-        records_table = Table(table_data, colWidths=[180, 100, 120, 100])
+        records_table = Table(table_data, colWidths=[180, 100, 120, 100], repeatRows=1)
         records_table.setStyle(
             TableStyle(
                 [
@@ -102,6 +95,34 @@ class PDFReportGenerator:
         )
         elements.append(records_table)
 
+        if len(records) > 50:
+            elements.append(Spacer(1, 8))
+            footnote_style = ParagraphStyle(
+                name="FootnoteStyle",
+                parent=styles["Italic"],
+                fontSize=8,
+                textColor=colors.HexColor("#64748b"),
+            )
+            elements.append(
+                Paragraph(
+                    "<i>Note: Showing first 50 intervals. Full data can be exported via XLSX.</i>",
+                    footnote_style,
+                )
+            )
+
+        return elements
+
+    def generate_line_report(self, line_id: str, records: Sequence[dict[str, Any]]) -> bytes:
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=36,
+            leftMargin=36,
+            topMargin=36,
+            bottomMargin=36,
+        )
+        elements = self._build_elements(line_id=line_id, records=records)
         doc.build(elements)
         buffer.seek(0)
         return buffer.getvalue()

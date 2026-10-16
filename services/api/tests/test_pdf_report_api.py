@@ -133,6 +133,7 @@ def test_pdf_report_generator_unit_empty_and_nulls():
 
 
 def test_pdf_report_generator_large_record_set():
+    from reportlab.platypus import Table
     from services.api.src.services.pdf_exporter import PDFReportGenerator
 
     generator = PDFReportGenerator()
@@ -145,7 +146,45 @@ def test_pdf_report_generator_large_record_set():
         }
         for i in range(65)
     ]
+    elements = generator._build_elements("line-large", records)
+    tables = [e for e in elements if isinstance(e, Table)]
+    assert len(tables) >= 2
+    records_table = tables[1]
+    assert records_table.repeatRows == 1
+
+    # Check footnote when records > 50
+    has_footnote = any("first 50 intervals" in getattr(e, "text", "") for e in elements)
+    assert has_footnote is True
+
+    # Check no footnote when records <= 50
+    elements_small = generator._build_elements("line-small", records[:50])
+    has_footnote_small = any("first 50 intervals" in getattr(e, "text", "") for e in elements_small)
+    assert has_footnote_small is False
+
     pdf_bytes = generator.generate_line_report("line-large", records)
     assert isinstance(pdf_bytes, bytes)
     assert pdf_bytes.startswith(b"%PDF")
+
+
+def test_export_pdf_report_special_characters(pdf_client):
+    res = pdf_client.get("/api/v1/reports/export?line_id=line%26test%3C1%3E&format=pdf")
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "application/pdf"
+    assert res.headers["content-disposition"] == 'attachment; filename="report_line&test<1>.pdf"'
+    assert res.content.startswith(b"%PDF")
+
+
+def test_pdf_report_generator_special_characters():
+    from services.api.src.services.pdf_exporter import PDFReportGenerator
+
+    generator = PDFReportGenerator()
+    pdf_bytes = generator.generate_line_report("line&test<1>", [])
+    assert isinstance(pdf_bytes, bytes)
+    assert pdf_bytes.startswith(b"%PDF")
+
+    # Also test tags that would trigger XML parse errors if unescaped
+    pdf_bytes_unescaped = generator.generate_line_report("line<unclosed>&'\"test<foo>", [])
+    assert isinstance(pdf_bytes_unescaped, bytes)
+    assert pdf_bytes_unescaped.startswith(b"%PDF")
+
 
