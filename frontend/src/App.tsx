@@ -200,7 +200,7 @@ function DashboardContent() {
                 </span>
               </div>
             </div>
-            <AlarmsView />
+            <AlarmsView lineId={currentLineId} />
           </div>
         ) : (
           <div>

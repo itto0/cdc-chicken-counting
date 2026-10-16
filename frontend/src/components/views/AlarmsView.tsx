@@ -113,24 +113,25 @@ export function formatToWIB(dateStr: string | null | undefined): string {
   }
 }
 
-export function AlarmsView({ lineId }: AlarmsViewProps) {
-  const { currentRole, lines } = useAppContext();
+export function AlarmsView({ lineId: propLineId }: AlarmsViewProps) {
+  const { currentRole, lines, currentLineId } = useAppContext();
   const isViewer = currentRole === "VIEWER";
 
   // Filter States
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("ALL");
-  const [lineFilter, setLineFilter] = useState<string>(lineId || "ALL");
+  const [selectedLineId, setSelectedLineId] = useState<string>(
+    propLineId || currentLineId || "ALL"
+  );
   const [searchQuery, setSearchQuery] = useState<string>("");
 
+  // Sync selected line when propLineId or global currentLineId changes
   useEffect(() => {
-    if (lineId) {
-      setLineFilter(lineId);
-    }
-  }, [lineId]);
+    setSelectedLineId(propLineId || currentLineId || "ALL");
+  }, [propLineId, currentLineId]);
 
   // Data States
-  const [alarms, setAlarms] = useState<AlarmDTO[]>([]);
+  const [allAlarms, setAllAlarms] = useState<AlarmDTO[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isOfflineFallback, setIsOfflineFallback] = useState<boolean>(false);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
@@ -165,27 +166,22 @@ export function AlarmsView({ lineId }: AlarmsViewProps) {
     setOperatorName(`${currentRole.toLowerCase()}_user`);
   }, [currentRole]);
 
-  // Fetch alarms from API
+  // Fetch all alarms for the selected line from API (decoupled from status/severity filters)
   const fetchAlarms = useCallback(async () => {
     setIsLoading(true);
     setErrorNotice(null);
 
-    const queryParams: { line_id?: string; status?: string; severity?: string } = {};
-
-    if (lineFilter !== "ALL") {
-      queryParams.line_id = lineFilter;
-    }
-    if (statusFilter !== "ALL") {
-      queryParams.status = statusFilter;
-    }
-    if (severityFilter !== "ALL") {
-      queryParams.severity = severityFilter;
-    }
+    const lineParam =
+      selectedLineId && selectedLineId.toLowerCase() !== "all"
+        ? selectedLineId
+        : undefined;
 
     try {
-      const data = await apiClient.getAlarms(queryParams);
+      const data = await apiClient.getAlarms({
+        line_id: lineParam,
+      });
       if (Array.isArray(data)) {
-        setAlarms(data);
+        setAllAlarms(data);
         setIsOfflineFallback(false);
       } else {
         throw new Error("Invalid alarms response structure");
@@ -196,50 +192,56 @@ export function AlarmsView({ lineId }: AlarmsViewProps) {
       setErrorNotice(
         "Mode Offline: Gagal terhubung ke server API Alarms (/api/v1/alarms). Menampilkan data simulasi lokal."
       );
-      // Filter mock data locally
+      // Filter mock data locally by line if specified
       let filtered = [...DEFAULT_MOCK_ALARMS];
-      if (lineFilter !== "ALL") {
-        filtered = filtered.filter((a) => a.line_id === lineFilter);
+      if (lineParam) {
+        filtered = filtered.filter((a) => a.line_id === lineParam);
       }
-      if (statusFilter !== "ALL") {
-        filtered = filtered.filter((a) => a.status.toUpperCase() === statusFilter);
-      }
-      if (severityFilter !== "ALL") {
-        filtered = filtered.filter((a) => a.severity.toUpperCase() === severityFilter);
-      }
-      setAlarms(filtered);
+      setAllAlarms(filtered);
     } finally {
       setIsLoading(false);
     }
-  }, [lineFilter, statusFilter, severityFilter]);
+  }, [selectedLineId]);
 
   useEffect(() => {
     fetchAlarms();
   }, [fetchAlarms]);
 
-  // In-memory search filtering (by search input keyword)
-  const displayAlarms = useMemo(() => {
-    if (!searchQuery.trim()) return alarms;
-    const q = searchQuery.toLowerCase().trim();
-    return alarms.filter(
-      (a) =>
-        a.id.toString().includes(q) ||
-        a.alarm_type.toLowerCase().includes(q) ||
-        a.message.toLowerCase().includes(q) ||
-        a.line_id.toLowerCase().includes(q) ||
-        a.severity.toLowerCase().includes(q)
-    );
-  }, [alarms, searchQuery]);
-
-  // Statistics counts
+  // Statistics counts computed from all alarms for selected line (remains intact when status filter changes)
   const stats = useMemo(() => {
-    const total = alarms.length;
-    const open = alarms.filter((a) => a.status.toUpperCase() === "OPEN").length;
-    const ack = alarms.filter((a) => a.status.toUpperCase() === "ACKNOWLEDGED").length;
-    const resolved = alarms.filter((a) => a.status.toUpperCase() === "RESOLVED").length;
-    const critical = alarms.filter((a) => a.severity.toUpperCase() === "CRITICAL").length;
+    const total = allAlarms.length;
+    const open = allAlarms.filter((a) => a.status.toUpperCase() === "OPEN").length;
+    const ack = allAlarms.filter((a) => a.status.toUpperCase() === "ACKNOWLEDGED").length;
+    const resolved = allAlarms.filter((a) => a.status.toUpperCase() === "RESOLVED").length;
+    const critical = allAlarms.filter((a) => a.severity.toUpperCase() === "CRITICAL").length;
     return { total, open, ack, resolved, critical };
-  }, [alarms]);
+  }, [allAlarms]);
+
+  // In-memory filtered alarms for table display (by status, severity, and search keyword)
+  const filteredAlarms = useMemo(() => {
+    return allAlarms.filter((alarm) => {
+      // Status filter
+      if (statusFilter !== "ALL" && alarm.status.toUpperCase() !== statusFilter) {
+        return false;
+      }
+      // Severity filter
+      if (severityFilter !== "ALL" && alarm.severity.toUpperCase() !== severityFilter) {
+        return false;
+      }
+      // Keyword search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const match =
+          alarm.id.toString().includes(q) ||
+          alarm.alarm_type.toLowerCase().includes(q) ||
+          alarm.message.toLowerCase().includes(q) ||
+          alarm.line_id.toLowerCase().includes(q) ||
+          alarm.severity.toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      return true;
+    });
+  }, [allAlarms, statusFilter, severityFilter, searchQuery]);
 
   // Open action modal
   const openActionModal = (alarm: AlarmDTO, type: "ACKNOWLEDGE" | "RESOLVE") => {
@@ -252,12 +254,24 @@ export function AlarmsView({ lineId }: AlarmsViewProps) {
   };
 
   // Close action modal
-  const closeActionModal = () => {
+  const closeActionModal = useCallback(() => {
     if (isSubmitting) return;
     setModalOpen(false);
     setTargetAlarm(null);
     setModalError(null);
-  };
+  }, [isSubmitting]);
+
+  // Close modal on Escape key press
+  useEffect(() => {
+    if (!modalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeActionModal();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [modalOpen, closeActionModal]);
 
   // Handle action confirmation (Acknowledge / Resolve)
   const handleConfirmAction = async (e: React.FormEvent) => {
@@ -282,7 +296,7 @@ export function AlarmsView({ lineId }: AlarmsViewProps) {
       if (isOfflineFallback) {
         // Optimistic local update in offline fallback
         const nowIso = new Date().toISOString();
-        setAlarms((prev) =>
+        setAllAlarms((prev) =>
           prev.map((item) => {
             if (item.id === targetAlarm.id) {
               const notePart = notes.trim() ? ` [${actionType === "ACKNOWLEDGE" ? "Ack Note" : "Resolution"}: ${notes.trim()} by ${operatorName.trim()}]` : "";
@@ -535,8 +549,8 @@ export function AlarmsView({ lineId }: AlarmsViewProps) {
               </label>
               <select
                 id="alarm-line-filter"
-                value={lineFilter}
-                onChange={(e) => setLineFilter(e.target.value)}
+                value={selectedLineId}
+                onChange={(e) => setSelectedLineId(e.target.value)}
                 className="bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-100 text-xs rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
               >
                 <option value="ALL">Semua Line</option>
@@ -580,7 +594,7 @@ export function AlarmsView({ lineId }: AlarmsViewProps) {
               Daftar Insiden Alarm
             </h3>
             <span className="text-xs text-slate-400 font-normal">
-              ({displayAlarms.length} insiden ditampilkan)
+              ({filteredAlarms.length} insiden ditampilkan)
             </span>
           </div>
 
@@ -616,14 +630,14 @@ export function AlarmsView({ lineId }: AlarmsViewProps) {
                     </div>
                   </td>
                 </tr>
-              ) : displayAlarms.length === 0 ? (
+              ) : filteredAlarms.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <CheckCircle2 className="w-8 h-8 text-emerald-500/80 mb-1" />
                       <span className="font-semibold text-slate-200">Tidak ada insiden alarm</span>
                       <span className="text-xs text-slate-400 max-w-sm">
-                        {statusFilter !== "ALL" || severityFilter !== "ALL" || lineFilter !== "ALL" || searchQuery
+                        {statusFilter !== "ALL" || severityFilter !== "ALL" || (selectedLineId && selectedLineId.toLowerCase() !== "all") || searchQuery
                           ? "Tidak ditemukan alarm yang sesuai dengan filter yang dipilih."
                           : "Sistem beroperasi optimal tanpa gangguan atau pelanggaran ambang batas."}
                       </span>
@@ -631,7 +645,7 @@ export function AlarmsView({ lineId }: AlarmsViewProps) {
                   </td>
                 </tr>
               ) : (
-                displayAlarms.map((alarm) => {
+                filteredAlarms.map((alarm) => {
                   const upperSev = alarm.severity.toUpperCase();
                   const upperStat = alarm.status.toUpperCase();
 
@@ -833,8 +847,16 @@ export function AlarmsView({ lineId }: AlarmsViewProps) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="alarm-action-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closeActionModal();
+            }
+          }}
         >
-          <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div
+            className="bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
             <div className="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
