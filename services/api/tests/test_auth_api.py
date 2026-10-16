@@ -166,6 +166,13 @@ def test_auth_me_user_not_found(auth_client):
     assert res.json()["detail"] == "User not found"
 
 
+def test_auth_me_inactive_user(auth_client):
+    inactive_token = create_access_token({"sub": "disabled", "role": "OPERATOR", "uid": 3})
+    res = auth_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {inactive_token}"})
+    assert res.status_code == 403
+    assert res.json()["detail"] == "User account is inactive"
+
+
 def test_hash_and_verify_password_unit():
     from services.api.src.services.auth import verify_password
     hashed = hash_password("my-secret-pass")

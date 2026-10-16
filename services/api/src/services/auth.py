@@ -1,9 +1,11 @@
 import hashlib
+import hmac
+import os
 import jwt
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-SECRET_KEY = "cdc-poultry-counter-secret-key"
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "cdc-poultry-counter-secret-key-32bytes")
 ALGORITHM = "HS256"
 
 
@@ -12,7 +14,7 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return hash_password(plain_password) == hashed_password
+    return hmac.compare_digest(hash_password(plain_password), hashed_password)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

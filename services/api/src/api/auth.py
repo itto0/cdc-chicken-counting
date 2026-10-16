@@ -64,5 +64,7 @@ def get_current_user(authorization: Optional[str] = Header(None), db: Session = 
     user = db.scalars(select(User).where(User.username == payload["sub"])).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="User account is inactive")
 
     return UserDTO(id=user.id, username=user.username, role=user.role, is_active=user.is_active)
