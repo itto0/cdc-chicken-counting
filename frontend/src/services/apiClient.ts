@@ -152,8 +152,10 @@ export async function getLineCounts(
   params?: CountQueryParams
 ): Promise<LineCountsResponse> {
   const query = new URLSearchParams();
-  if (params?.from) query.append("from", params.from);
-  if (params?.to) query.append("to", params.to);
+  const fromVal = params?.from || params?.from_time;
+  const toVal = params?.to || params?.to_time;
+  if (fromVal) query.append("from", fromVal);
+  if (toVal) query.append("to", toVal);
   if (params?.granularity) query.append("granularity", params.granularity);
   if (params?.page !== undefined) query.append("page", String(params.page));
   if (params?.limit !== undefined) query.append("limit", String(params.limit));
@@ -228,11 +230,45 @@ export async function getMe(): Promise<UserDTO> {
  * Generate full download URL for Excel or PDF reports.
  */
 export function getExportUrl(
+  format: "xlsx" | "pdf",
   lineId: string,
-  format: "xlsx" | "pdf" = "xlsx",
   fromTime?: string,
   toTime?: string
+): string;
+export function getExportUrl(
+  lineId: string,
+  format?: "xlsx" | "pdf",
+  fromTime?: string,
+  toTime?: string
+): string;
+export function getExportUrl(
+  arg1: string,
+  arg2?: string,
+  arg3?: string,
+  arg4?: string
 ): string {
+  let format: "xlsx" | "pdf" = "xlsx";
+  let lineId = "line-1";
+  let fromTime: string | undefined = undefined;
+  let toTime: string | undefined = undefined;
+
+  if (arg1 === "xlsx" || arg1 === "pdf") {
+    format = arg1;
+    lineId = arg2 || "line-1";
+    fromTime = arg3;
+    toTime = arg4;
+  } else {
+    lineId = arg1;
+    if (arg2 === "xlsx" || arg2 === "pdf") {
+      format = arg2;
+      fromTime = arg3;
+      toTime = arg4;
+    } else {
+      fromTime = arg2;
+      toTime = arg3;
+    }
+  }
+
   const base = getBaseUrl().replace(/\/$/, "");
   const params = new URLSearchParams();
   params.append("line_id", lineId);

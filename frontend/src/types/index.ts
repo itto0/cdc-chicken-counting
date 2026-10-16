@@ -70,6 +70,8 @@ export type CountsHistoryResponse = LineCountsResponse;
 export interface CountQueryParams {
   from?: string;
   to?: string;
+  from_time?: string;
+  to_time?: string;
   granularity?: "minute" | "hourly" | "daily" | string;
   page?: number;
   limit?: number;

@@ -14,6 +14,7 @@ import { AppProvider, useAppContext } from "./context/AppContext";
 import { OverviewView } from "./components/OverviewView";
 import { LiveStreamView } from "./components/views/LiveStreamView";
 import { AlarmsView } from "./components/views/AlarmsView";
+import { ReportsView } from "./components/views/ReportsView";
 
 interface NavTab {
   key: TabKey;
@@ -201,6 +202,20 @@ function DashboardContent() {
               </div>
             </div>
             <AlarmsView lineId={currentLineId} />
+          </div>
+        ) : activeTab === "reports" ? (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-slate-100">
+                  Laporan & Analisis Data
+                </h2>
+                <span className="text-xs text-slate-400">
+                  Rekapitulasi kuantitas karkas, tren throughput per interval, dan ekspor dokumen resmi
+                </span>
+              </div>
+            </div>
+            <ReportsView lineId={currentLineId} />
           </div>
         ) : (
           <div>
