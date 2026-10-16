@@ -229,7 +229,7 @@ export function ReportsView({ lineId }: ReportsViewProps) {
   const [isFallback, setIsFallback] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<"xlsx" | "pdf" | null>(null);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
-  const exportFeedbackTimeoutRef = useRef<NodeJS.Timeout | number | null>(null);
+  const exportFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clear export feedback timer on unmount
   useEffect(() => {
