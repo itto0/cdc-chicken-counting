@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: services/api/Dockerfile
+    env_file:
+      - .env
     ports:
       - "${PORT:-8070}:${PORT:-8070}"
     environment:
@@ -16,6 +18,8 @@ services:
     build:
       context: .
       dockerfile: services/counter/Dockerfile
+    env_file:
+      - .env
     environment:
       - API_SYNC_URL=http://api:${PORT:-8070}/api/v1/sync/batch
       - LINE_ID=lineA
