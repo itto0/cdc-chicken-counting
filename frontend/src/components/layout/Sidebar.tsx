@@ -13,7 +13,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Mobile backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-xs lg:hidden"
+          aria-hidden="true"
+          className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm lg:hidden"
           onClick={onClose}
         />
       )}
@@ -44,6 +45,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <NavLink
                 key={item.id}
                 to={item.path}
+                end={item.path === "/"}
                 onClick={onClose}
                 className={({ isActive }) =>
                   cn(
