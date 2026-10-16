@@ -208,12 +208,13 @@ function getStoredThresholds(lineId: string): ThresholdSettings {
   return DEFAULT_THRESHOLDS;
 }
 
-function setStoredThresholds(lineId: string, thresholds: ThresholdSettings): void {
-  if (typeof window === "undefined" || !window.localStorage) return;
+function setStoredThresholds(lineId: string, thresholds: ThresholdSettings): boolean {
+  if (typeof window === "undefined" || !window.localStorage) return false;
   try {
     window.localStorage.setItem(`${THRESHOLD_STORAGE_PREFIX}${lineId}`, JSON.stringify(thresholds));
+    return true;
   } catch {
-    // ignore storage error
+    return false;
   }
 }
 
@@ -231,17 +232,22 @@ function getStoredTargetSpeed(lineId: string): number {
   return 120;
 }
 
-function setStoredTargetSpeed(lineId: string, speed: number): void {
-  if (typeof window === "undefined" || !window.localStorage) return;
+function setStoredTargetSpeed(lineId: string, speed: number): boolean {
+  if (typeof window === "undefined" || !window.localStorage) return false;
   try {
     window.localStorage.setItem(`${TARGET_SPEED_STORAGE_PREFIX}${lineId}`, String(speed));
+    return true;
   } catch {
-    // ignore storage error
+    return false;
   }
 }
 
 export function SettingsView({ lineId: propLineId }: SettingsViewProps) {
   const { currentLineId, setLineId, currentRole, lines, refreshLines } = useAppContext();
+
+  // Keep a ref to lines to avoid re-triggering loadLineDetails when lines is refreshed
+  const linesRef = useRef(lines);
+  linesRef.current = lines;
 
   // Selected line id sync
   const activeLineId = propLineId || currentLineId || (lines[0]?.id ?? "line-1");
@@ -322,7 +328,7 @@ export function SettingsView({ lineId: propLineId }: SettingsViewProps) {
       const storedSpeed = getStoredTargetSpeed(targetId);
 
       // Fallback data from context
-      const fallbackLine = lines.find((l) => l.id === targetId) || lines[0];
+      const fallbackLine = linesRef.current.find((l) => l.id === targetId) || linesRef.current[0];
 
       try {
         let lineDetail: LineDetailDTO | null = null;
@@ -356,7 +362,7 @@ export function SettingsView({ lineId: propLineId }: SettingsViewProps) {
         setIsLoadingLine(false);
       }
     },
-    [lines, clearSuccessMsg]
+    [clearSuccessMsg]
   );
 
   useEffect(() => {
@@ -427,7 +433,13 @@ export function SettingsView({ lineId: propLineId }: SettingsViewProps) {
       });
 
       // Save target speed in local storage
-      setStoredTargetSpeed(activeLineId, Number(lineForm.target_speed));
+      const speedSaved = setStoredTargetSpeed(activeLineId, Number(lineForm.target_speed));
+      if (!speedSaved) {
+        setSaveErrorMsg(
+          "Gagal menyimpan target kecepatan konveyor ke penyimpanan lokal browser."
+        );
+        return;
+      }
 
       // Refresh global lines context
       await refreshLines();
@@ -471,6 +483,11 @@ export function SettingsView({ lineId: propLineId }: SettingsViewProps) {
     }
 
     // Validation
+    if (thresholds.under_critical <= 0) {
+      setSaveErrorMsg("Batas kritis lambat harus bernilai minimal 1 CPM.");
+      return;
+    }
+
     if (thresholds.under_critical >= thresholds.under_warning) {
       setSaveErrorMsg(
         "Batas kritis lambat harus bernilai lebih kecil dari batas peringatan lambat."
@@ -501,7 +518,11 @@ export function SettingsView({ lineId: propLineId }: SettingsViewProps) {
     setSaveErrorMsg(null);
 
     try {
-      setStoredThresholds(activeLineId, thresholds);
+      const stored = setStoredThresholds(activeLineId, thresholds);
+      if (!stored) {
+        setSaveErrorMsg("Gagal menyimpan ambang batas ke penyimpanan lokal browser.");
+        return;
+      }
       setInitialThresholds({ ...thresholds });
       triggerSuccessMsg(
         `Ambang batas alarm untuk jalur ${activeLineId} berhasil disimpan.`
