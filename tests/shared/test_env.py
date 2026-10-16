@@ -52,3 +52,16 @@ def test_init_env_returns_false_when_file_not_found():
     loaded = init_env(dotenv_path="/nonexistent/path/to/.env")
     assert loaded is False
 
+
+def test_session_reads_database_url_from_env(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///test_custom_api.db")
+    import importlib
+    import services.api.src.db.session as session_mod
+    importlib.reload(session_mod)
+    try:
+        assert session_mod.DATABASE_URL == "sqlite:///test_custom_api.db"
+    finally:
+        monkeypatch.undo()
+        importlib.reload(session_mod)
+
+

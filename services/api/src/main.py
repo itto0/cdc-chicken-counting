@@ -1,6 +1,11 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from fastapi import FastAPI
+
+from shared.env import init_env
+
+init_env()
+
 from services.api.src.api.alarms import router as alarms_router
 from services.api.src.api.auth import router as auth_router
 from services.api.src.api.counts import router as counts_router

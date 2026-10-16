@@ -3,6 +3,10 @@ from collections.abc import Generator
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
+from shared.env import init_env
+
+init_env()
+
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///api_central.db")
 
 connect_args = {}
