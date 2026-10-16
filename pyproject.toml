@@ -9,7 +9,11 @@ description = "Poultry Counting Service and Dashboard"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.5.0",
+    "python-dotenv>=1.0.0",
 ]
+
+[tool.setuptools.packages.find]
+include = ["services*", "shared*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
