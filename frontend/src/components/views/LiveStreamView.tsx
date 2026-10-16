@@ -106,7 +106,7 @@ export function LiveStreamView({ lineId }: LiveStreamViewProps) {
     if (diffSec < 60) return `${diffSec} detik lalu`;
     const diffMin = Math.floor(diffSec / 60);
     if (diffMin < 60) return `${diffMin} menit lalu`;
-    return new Date(lastCountTime).toLocaleTimeString("id-ID");
+    return new Date(lastCountTime).toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta" });
   }, [lastCountTime, now]);
 
   // Conveyor Speed Threshold Matrix computation
@@ -487,7 +487,7 @@ export function LiveStreamView({ lineId }: LiveStreamViewProps) {
                   {relativeLastDetection}
                 </div>
                 <div className="text-[11px] text-slate-400 mt-0.5 font-mono truncate">
-                  {lastCountTime ? new Date(lastCountTime).toLocaleTimeString("id-ID") + " WIB" : "Menunggu ayam melintas..."}
+                  {lastCountTime ? new Date(lastCountTime).toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB" : "Menunggu ayam melintas..."}
                 </div>
               </div>
 

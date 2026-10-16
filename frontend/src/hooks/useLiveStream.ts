@@ -232,6 +232,12 @@ export function useLiveStream(lineId: string): LiveStreamState {
   useEffect(() => {
     isMountedRef.current = true;
     backoffDelayRef.current = INITIAL_DELAY_MS;
+    // Reset telemetry state on line switch so previous line's values don't show while connecting
+    setLiveSpeed(0);
+    setLastCountTime(null);
+    setFps(0);
+    setLatencyMs(0);
+    setTotalToday(0);
     connect();
 
     return () => {
