@@ -732,6 +732,17 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="Minimum bounding box height for MockDetector (default: 10.0)",
     )
     parser.add_argument(
+        "--occupancy-threshold",
+        type=float,
+        default=float(os.getenv("OCCUPANCY_THRESHOLD", "4.5")),
+        help="Carcass occupancy gradient threshold for ShackleDetector to reject empty shackles (default: 4.5)",
+    )
+    parser.add_argument(
+        "--no-occupancy-check",
+        action="store_true",
+        help="Disable carcass occupancy verification in ShackleDetector (detects all shackles regardless of occupancy)",
+    )
+    parser.add_argument(
         "--line",
         default=os.getenv("LINE_COORDS", ""),
         help="Virtual crossing line as x1,y1,x2,y2 (e.g. '0,240,640,240')",
@@ -871,8 +882,12 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 chosen_detector = "mock"
 
     if chosen_detector == "shackle":
-        detector = ShackleDetector(min_confidence=args.conf)
-        logger.info("Initialized ShackleDetector for industrial shackle conveyor line")
+        detector = ShackleDetector(
+            min_confidence=args.conf,
+            occupancy_check=not args.no_occupancy_check,
+            occupancy_threshold=args.occupancy_threshold,
+        )
+        logger.info("Initialized ShackleDetector for industrial shackle conveyor line (occupancy_check=%s, thresh=%.1f)", not args.no_occupancy_check, args.occupancy_threshold)
     elif chosen_detector == "mock" or detector is None:
         detector = MockDetector(
             min_confidence=args.conf,

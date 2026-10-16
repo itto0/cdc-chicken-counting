@@ -285,6 +285,7 @@ def test_shackle_detector_detects_spaced_shackles():
         chicken_width=80.0,
         chicken_height=300.0,
         chicken_y_top=250.0,
+        occupancy_check=False,
     )
     frame = np.zeros((600, 800, 3), dtype=np.uint8)
     # Draw three distinct vertical shackle bars in the shackle band y in [120, 300]
@@ -330,4 +331,89 @@ def test_mock_detector_area_and_morph_filters():
     det = detections[0]
     assert 95.0 <= det.x1 <= 105.0
     assert 125.0 <= det.x2 <= 135.0
+
+
+def test_shackle_detector_rejects_empty_shackle():
+    """Verify ShackleDetector rejects empty shackles where no chicken carcass is present."""
+    detector = ShackleDetector(
+        shackle_y_ratio=(0.20, 0.50),
+        min_spacing=50.0,
+        chicken_width=80.0,
+        chicken_height=300.0,
+        chicken_y_top=250.0,
+        occupancy_check=True,
+    )
+    frame = np.zeros((600, 800, 3), dtype=np.uint8)
+    # Shackle 1 at cx=200 has a chicken carcass below it
+    frame[150:280, 195:205] = 255
+    frame[370:440, 197:203] = 220  # carcass presence in [0.62*h, 0.74*h]
+
+    # Shackle 2 at cx=400 is EMPTY (only the metal bar, zero carcass below)
+    frame[150:280, 395:405] = 255
+
+    # Shackle 3 at cx=600 has a chicken carcass below it
+    frame[150:280, 595:605] = 255
+    frame[370:440, 597:603] = 220
+
+    detections = detector.predict(frame)
+    # Only the 2 occupied shackles should be detected; empty shackle at cx=400 must be rejected
+    assert len(detections) == 2
+    centers = [(d.x1 + d.x2) / 2.0 for d in detections]
+    assert pytest.approx(centers[0], abs=15) == 200.0
+    assert pytest.approx(centers[1], abs=15) == 600.0
+
+
+def test_shackle_detector_occupancy_check_disabled_detects_all():
+    """Verify ShackleDetector with occupancy_check=False detects all shackle brackets."""
+    detector = ShackleDetector(
+        shackle_y_ratio=(0.20, 0.50),
+        min_spacing=50.0,
+        chicken_width=80.0,
+        chicken_height=300.0,
+        chicken_y_top=250.0,
+        occupancy_check=False,
+    )
+    frame = np.zeros((600, 800, 3), dtype=np.uint8)
+    frame[150:280, 195:205] = 255
+    frame[150:280, 395:405] = 255  # Empty shackle
+
+    detections = detector.predict(frame)
+    assert len(detections) == 2
+
+
+def test_shackle_detector_video_frame_rejects_empty_shackle():
+    """Verify ShackleDetector on Rekaman_2.MOV frame 3160 suppresses empty shackle at cx ~ 1322."""
+    import os
+    import cv2
+
+    video_path = "samples/Rekaman_2.MOV"
+    if not os.path.exists(video_path):
+        pytest.skip(f"Video file {video_path} not found")
+
+    cap = cv2.VideoCapture(video_path)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 3160)
+    ret, frame = cap.read()
+    cap.release()
+    assert ret and frame is not None
+
+    detector = ShackleDetector(occupancy_check=True)
+    detections = detector.predict(frame)
+
+    # In frame 3160, the empty shackle bracket is at cx ~ 1322
+    # Verify no detection has center in range [1300, 1345]
+    empty_shackle_dets = [
+        d for d in detections if 1300.0 <= (d.x1 + d.x2) / 2.0 <= 1345.0
+    ]
+    assert len(empty_shackle_dets) == 0
+
+    # Ensure occupied chickens on both sides are still detected
+    occupied_left = [
+        d for d in detections if 1200.0 <= (d.x1 + d.x2) / 2.0 <= 1245.0
+    ]
+    occupied_right = [
+        d for d in detections if 1420.0 <= (d.x1 + d.x2) / 2.0 <= 1460.0
+    ]
+    assert len(occupied_left) == 1
+    assert len(occupied_right) == 1
+
 

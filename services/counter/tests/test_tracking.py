@@ -489,3 +489,50 @@ def test_association_distance_competition():
     assert counter.tracks[1].current_anchor == det_a.anchor_bottom_center
     # Track 2 created with det_b
     assert counter.tracks[2].current_anchor == det_b.anchor_bottom_center
+
+
+def test_empty_shackle_not_counted_during_tracking():
+    """Verify that an empty shackle traversing across the count line does not trigger a false count."""
+    import os
+    import cv2
+    import pytest
+    from services.counter.src.detection.detector import ShackleDetector
+
+    video_path = "samples/Rekaman_2.MOV"
+    if not os.path.exists(video_path):
+        pytest.skip(f"Video file {video_path} not found")
+
+    cap = cv2.VideoCapture(video_path)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 3020)
+
+    line_zone = VirtualLineZone(
+        start=(960.0, 216.0), end=(960.0, 972.0), direction="right"
+    )
+    counter = ChickenCounter(line_zone=line_zone, line_id="lineA", max_distance=96.0)
+    detector = ShackleDetector(occupancy_check=True)
+
+    counted_events = []
+    # Process frames 3020 to 3120 spanning the empty shackle traversal across virtual line
+    for f in range(3020, 3120):
+        ret, frame = cap.read()
+        if not ret:
+            break
+        detections = detector.predict(frame)
+        events = counter.update(detections)
+        if events:
+            for ev in events:
+                counted_events.append((f, ev))
+
+    cap.release()
+
+    # In frames 3020..3120:
+    # 2 real chickens cross at frame ~3027 and ~3051
+    # 1 empty shackle passes line at frame ~3078 (must NOT be counted)
+    # 1 real chicken crosses at frame ~3103
+    # Exactly 3 chickens should be counted, not 4
+    assert len(counted_events) == 3
+    assert counter.total_count == 3
+    counted_frames = [item[0] for item in counted_events]
+    # Verify no count happened around frame 3078
+    assert not any(3070 <= f <= 3085 for f in counted_frames)
+

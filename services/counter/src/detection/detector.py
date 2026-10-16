@@ -158,6 +158,9 @@ class ShackleDetector(Detector):
         chicken_y_top_ratio: float = 0.25,
         class_name: str = "chicken",
         class_id: int = 0,
+        occupancy_check: bool = True,
+        carcass_y_ratio: tuple[float, float] = (0.62, 0.76),
+        occupancy_threshold: float = 4.5,
     ) -> None:
         self.min_confidence = min_confidence
         self.shackle_y_ratio = shackle_y_ratio
@@ -168,6 +171,9 @@ class ShackleDetector(Detector):
         self.chicken_y_top_ratio = chicken_y_top_ratio
         self.class_name = class_name
         self.class_id = class_id
+        self.occupancy_check = occupancy_check
+        self.carcass_y_ratio = carcass_y_ratio
+        self.occupancy_threshold = occupancy_threshold
 
     def predict(self, frame: np.ndarray) -> list[Detection]:
         """Detect individual chickens on the shackle line with regular spacing."""
@@ -220,7 +226,30 @@ class ShackleDetector(Detector):
         box_w = float(self.chicken_width)
         box_h = float(self.chicken_height)
 
+        full_gray = None
+        y1_carcass = 0
+        y2_carcass = 0
+        if self.occupancy_check:
+            full_gray = (
+                cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                if frame.ndim == 3
+                else frame
+            )
+            y1_carcass = int(max(0.0, min(1.0, self.carcass_y_ratio[0])) * h)
+            y2_carcass = int(max(0.0, min(1.0, self.carcass_y_ratio[1])) * h)
+
         for cx in centers:
+            if self.occupancy_check and full_gray is not None and y2_carcass > y1_carcass:
+                pw = max(6, int(0.006 * w))
+                px1 = max(0, cx - pw)
+                px2 = min(w, cx + pw)
+                patch = full_gray[y1_carcass:y2_carcass, px1:px2]
+                if patch.size == 0:
+                    continue
+                sx = float(np.abs(cv2.Sobel(patch, cv2.CV_16S, 1, 0)).mean())
+                if sx < self.occupancy_threshold:
+                    continue
+
             x1 = max(0.0, float(cx - box_w / 2.0))
             x2 = min(float(w), float(cx + box_w / 2.0))
             y1 = max(0.0, float(y_top))

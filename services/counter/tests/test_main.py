@@ -254,3 +254,44 @@ def test_main_argv_video_standalone(tmp_path):
     assert Path(db_path).exists()
 
 
+def test_main_argv_shackle_detector_options(tmp_path):
+    """Verify parse_args and ShackleDetector setup with occupancy check options."""
+    from services.counter.main import parse_args
+    from services.counter.src.detection.detector import ShackleDetector
+    import cv2
+    import numpy as np
+
+    video_path = tmp_path / "shackle_test.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    out = cv2.VideoWriter(str(video_path), fourcc, 30, (64, 48))
+    for _ in range(5):
+        frame = np.zeros((48, 64, 3), dtype=np.uint8)
+        out.write(frame)
+    out.release()
+
+    db_path = str(tmp_path / "shackle_argv.db")
+    args = parse_args([
+        "--video", str(video_path),
+        "--detector", "shackle",
+        "--occupancy-threshold", "5.2",
+        "--no-occupancy-check",
+        "--no-sync",
+        "--db-path", db_path,
+    ])
+    assert args.detector == "shackle"
+    assert args.occupancy_threshold == 5.2
+    assert args.no_occupancy_check is True
+
+    # Run main with shackle detector options
+    main([
+        "--video", str(video_path),
+        "--detector", "shackle",
+        "--occupancy-threshold", "5.2",
+        "--no-occupancy-check",
+        "--no-sync",
+        "--db-path", db_path,
+        "--max-frames", "5",
+    ])
+    assert Path(db_path).exists()
+
+
