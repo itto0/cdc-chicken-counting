@@ -2,8 +2,10 @@ import asyncio
 import json
 import threading
 from typing import Any
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
+
+from services.api.src.services.preview import FrameGenerator
 
 router = APIRouter(prefix="/api/v1/lines", tags=["live"])
 
@@ -180,3 +182,45 @@ async def live_stream(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.get("/{line_id}/preview")
+async def preview_stream(
+    line_id: str,
+    request: Request,
+    max_frames: int | None = Query(default=None, ge=0, description="Max frames to yield before closing"),
+):
+    """MJPEG live preview stream delivering synthetic annotated camera feed."""
+    if not line_id or not line_id.strip():
+        raise HTTPException(status_code=400, detail="Invalid line_id")
+
+    limit_frames = max_frames if isinstance(max_frames, int) else None
+
+    async def frame_stream():
+        frame_idx = 0
+        try:
+            while True:
+                if limit_frames is not None and frame_idx >= limit_frames:
+                    break
+                if await request.is_disconnected():
+                    break
+                jpeg_bytes = FrameGenerator.generate_jpeg_frame(line_id, frame_idx)
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n" + jpeg_bytes + b"\r\n"
+                )
+                frame_idx += 1
+                await asyncio.sleep(0.066)  # ~15 fps
+        except asyncio.CancelledError:
+            pass
+
+    return StreamingResponse(
+        frame_stream(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
+
