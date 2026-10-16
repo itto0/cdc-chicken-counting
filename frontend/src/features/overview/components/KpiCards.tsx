@@ -69,7 +69,7 @@ export function KpiCards({ summary }: KpiCardsProps) {
             <div className="w-28 bg-slate-100 rounded-full h-1.5 mt-2 overflow-hidden">
               <div
                 className="bg-emerald-500 h-1.5 rounded-full"
-                style={{ width: `${Math.min(attainment, 100)}%` }}
+                style={{ width: `${Math.max(0, Math.min(Number(attainment) || 0, 100))}%` }}
               />
             </div>
           </div>

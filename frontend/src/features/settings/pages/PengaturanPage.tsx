@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LineSelector } from "@/components/layout/LineSelector";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -14,6 +14,13 @@ export default function PengaturanPage() {
   const [lineName, setLineName] = useState(currentLine?.name || "Lini Konveyor 1");
   const [dailyTarget, setDailyTarget] = useState(currentLine?.daily_target || 60000);
   const [isSaved, setIsSaved] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (currentLine) {
@@ -25,7 +32,8 @@ export default function PengaturanPage() {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2500);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setIsSaved(false), 2500);
   };
 
   return (

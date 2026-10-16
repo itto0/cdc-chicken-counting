@@ -29,7 +29,7 @@ export function ReportsTable({ data }: ReportsTableProps) {
           {data.map((row, idx) => (
             <TableRow key={idx}>
               <TableCell className="font-medium text-slate-900">{row.bucket}</TableCell>
-              <TableCell>{row.count.toLocaleString("id-ID")}</TableCell>
+              <TableCell>{(row.count ?? 0).toLocaleString("id-ID")}</TableCell>
               <TableCell>{row.rate_per_min} cpm</TableCell>
               <TableCell>
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700">

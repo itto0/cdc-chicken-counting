@@ -41,18 +41,18 @@ export default function LaporanPage() {
   }, [currentLineId, granularity]);
 
   const handleExportCSV = () => {
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      ["Rentang Waktu,Total Ayam,Kecepatan (cpm),Status"]
-        .concat(data.map((d) => `"${d.bucket}",${d.count},${d.rate_per_min},"${d.status || "Normal"}"`))
-        .join("\n");
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = ["Rentang Waktu,Total Ayam,Kecepatan (cpm),Status"]
+      .concat(data.map((d) => `"${d.bucket}",${d.count},${d.rate_per_min},"${d.status || "Normal"}"`))
+      .join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", url);
     link.setAttribute("download", `laporan-${currentLineId || "lini"}-${granularity}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Eye, RotateCw } from "lucide-react";
 
@@ -11,6 +11,10 @@ interface VideoPlayerProps {
 
 export function VideoPlayer({ canvasRef, previewUrl, isConnected, onRetry }: VideoPlayerProps) {
   const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [previewUrl]);
 
   return (
     <Card className="overflow-hidden bg-slate-900 border-slate-300 shadow-sm">

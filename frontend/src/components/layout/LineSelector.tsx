@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Layers } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { Select } from "@/components/ui/select";
@@ -10,12 +11,13 @@ export interface LineSelectorProps {
 
 export function LineSelector({ className, showLabel = true }: LineSelectorProps) {
   const { currentLineId, setLineId, lines } = useAppContext();
+  const selectId = useId();
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
       {showLabel && (
         <label
-          htmlFor="page-line-select"
+          htmlFor={selectId}
           className="text-xs font-medium text-slate-500 flex items-center gap-1 whitespace-nowrap"
         >
           <Layers className="w-3.5 h-3.5 text-slate-400" />
@@ -23,7 +25,7 @@ export function LineSelector({ className, showLabel = true }: LineSelectorProps)
         </label>
       )}
       <Select
-        id="page-line-select"
+        id={selectId}
         value={currentLineId}
         onChange={(e) => setLineId(e.target.value)}
         className="font-medium text-xs sm:text-sm h-8 py-0 min-w-[150px]"

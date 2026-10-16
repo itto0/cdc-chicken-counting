@@ -37,8 +37,8 @@ export default function LiniProduksiPage() {
       </PageHeader>
 
       <StreamMetrics
-        fps={fps || 30}
-        latencyMs={latencyMs || 42}
+        fps={fps ?? 30}
+        latencyMs={latencyMs ?? 42}
         cameraStatus={isStreaming ? "online" : "menghubungkan"}
       />
 

@@ -19,7 +19,7 @@ export function AlarmsTable({ alarms, onAcknowledge, onResolve }: AlarmsTablePro
   }
 
   const getSeverityBadge = (severity: string) => {
-    switch (severity.toLowerCase()) {
+    switch ((severity || "").toLowerCase()) {
       case "critical":
       case "high":
         return <Badge variant="destructive">Tinggi</Badge>;

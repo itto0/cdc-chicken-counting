@@ -60,9 +60,7 @@ export async function http<T>(endpoint: string, options: RequestInit = {}): Prom
     throw new Error(parsedMessage);
   }
 
-  if (response.status === 204) {
-    return null as T;
-  }
-
-  return response.json() as Promise<T>;
+  if (response.status === 204) return null as T;
+  const text = await response.text();
+  return text ? (JSON.parse(text) as T) : (null as T);
 }

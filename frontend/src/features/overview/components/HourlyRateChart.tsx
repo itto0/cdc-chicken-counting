@@ -75,7 +75,9 @@ export function HourlyRateChart({ data }: HourlyRateChartProps) {
         <CardTitle>Laju Penghitungan per Jam</CardTitle>
       </CardHeader>
       <CardContent>
-        <ReactECharts option={option} style={{ height: "320px", width: "100%" }} />
+        <div className="h-[320px] w-full">
+          <ReactECharts option={option} notMerge={true} style={{ height: "100%", width: "100%" }} />
+        </div>
       </CardContent>
     </Card>
   );
