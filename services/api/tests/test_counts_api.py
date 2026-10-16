@@ -33,6 +33,14 @@ def counts_client():
         status="NORMAL"
     ))
     db.add(Line(id="line-empty", name="Line Empty", daily_target=500, is_active=True))
+
+    # Line for testing deterministic tie-breaker ordering with identical timestamps
+    db.add(Line(id="line-tie", name="Line Tie", daily_target=100, is_active=True))
+    same_ts = datetime(2026, 10, 16, 12, 0, 0, tzinfo=timezone.utc)
+    db.add(CountEvent(id=101, line_id="line-tie", track_id=1, ts_utc=same_ts, confidence=0.99))
+    db.add(CountEvent(id=102, line_id="line-tie", track_id=2, ts_utc=same_ts, confidence=0.99))
+    db.add(CountEvent(id=103, line_id="line-tie", track_id=3, ts_utc=same_ts, confidence=0.99))
+
     db.commit()
     db.close()
 
@@ -94,3 +102,42 @@ def test_get_line_counts_empty(counts_client):
     assert data["aggregates"] == []
     assert data["events"] == []
     assert data["pagination"]["total"] == 0
+
+
+def test_get_line_counts_invalid_from_datetime(counts_client):
+    response = counts_client.get("/api/v1/lines/line-1/counts?from=invalid-date")
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "Invalid datetime format for from_time. Expected ISO 8601 format." in detail
+
+
+def test_get_line_counts_invalid_to_datetime(counts_client):
+    response = counts_client.get("/api/v1/lines/line-1/counts?to=invalid-date")
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "Invalid datetime format for to_time. Expected ISO 8601 format." in detail
+
+
+def test_get_line_counts_invalid_page(counts_client):
+    response = counts_client.get("/api/v1/lines/line-1/counts?page=0")
+    assert response.status_code == 422
+
+
+def test_get_line_counts_invalid_granularity(counts_client):
+    response = counts_client.get("/api/v1/lines/line-1/counts?granularity=invalid_val")
+    assert response.status_code == 422
+
+
+def test_get_line_counts_valid_granularity(counts_client):
+    for gran in ["minute", "hourly", "daily"]:
+        response = counts_client.get(f"/api/v1/lines/line-1/counts?granularity={gran}")
+        assert response.status_code == 200
+
+
+def test_get_line_counts_deterministic_tie_breaker_ordering(counts_client):
+    response = counts_client.get("/api/v1/lines/line-tie/counts")
+    assert response.status_code == 200
+    events = response.json()["events"]
+    assert len(events) == 3
+    # Same ts_utc, ordered descending by id (103, 102, 101)
+    assert [e["id"] for e in events] == [103, 102, 101]
