@@ -5,6 +5,7 @@ from services.counter.src.detection.detector import (
     Detector,
     MockDetector,
     ONNXDetector,
+    ShackleDetector,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "Detector",
     "MockDetector",
     "ONNXDetector",
+    "ShackleDetector",
 ]

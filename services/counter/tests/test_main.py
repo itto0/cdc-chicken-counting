@@ -1,5 +1,6 @@
 """Tests for edge counter service production entrypoint and runner."""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 import pytest
 from services.counter.main import CounterService, main
@@ -213,4 +214,43 @@ def test_counter_service_aggregate_status_levels(tmp_path):
     aggs = storage.get_unsynced_aggregates(line_id="lineStatus")
     assert len(aggs) == 3
     assert aggs[2]["status"] == "CRITICAL"
+
+
+def test_main_argv_video_standalone(tmp_path):
+    """Verify main() handles --video, --no-sync, and --db-path arguments."""
+    from services.counter.main import parse_args
+    import cv2
+    import numpy as np
+
+    # Create dummy video file
+    video_path = tmp_path / "test_vid.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    out = cv2.VideoWriter(str(video_path), fourcc, 30, (64, 48))
+    for _ in range(5):
+        frame = np.zeros((48, 64, 3), dtype=np.uint8)
+        out.write(frame)
+    out.release()
+
+    db_path = str(tmp_path / "argv_test.db")
+    args = parse_args([
+        "--video", str(video_path),
+        "--no-sync",
+        "--db-path", db_path,
+        "--line", "0,24,64,24",
+        "--direction", "down",
+    ])
+    assert args.video == str(video_path)
+    assert args.no_sync is True
+    assert args.db_path == db_path
+    assert args.line == "0,24,64,24"
+
+    # Run main with these arguments
+    main([
+        "--video", str(video_path),
+        "--no-sync",
+        "--db-path", db_path,
+        "--max-frames", "5",
+    ])
+    assert Path(db_path).exists()
+
 

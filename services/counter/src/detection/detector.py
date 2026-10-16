@@ -6,7 +6,7 @@ from typing import Sequence
 import cv2
 import numpy as np
 
-__all__ = ["Detection", "Detector", "MockDetector", "ONNXDetector"]
+__all__ = ["Detection", "Detector", "MockDetector", "ONNXDetector", "ShackleDetector"]
 
 
 @dataclass(frozen=True)
@@ -61,16 +61,26 @@ class MockDetector(Detector):
         min_confidence: float = 0.85,
         min_width: float = 10.0,
         min_height: float = 10.0,
+        min_area: float = 0.0,
+        max_area: float | None = None,
         intensity_threshold: int = 150,
         class_name: str = "chicken",
         class_id: int = 0,
+        apply_blur: bool = False,
+        morph_open: bool = False,
+        roi: tuple[int, int, int, int] | None = None,
     ) -> None:
         self.min_confidence = min_confidence
         self.min_width = min_width
         self.min_height = min_height
+        self.min_area = min_area
+        self.max_area = max_area
         self.intensity_threshold = intensity_threshold
         self.class_name = class_name
         self.class_id = class_id
+        self.apply_blur = apply_blur
+        self.morph_open = morph_open
+        self.roi = roi
 
     def predict(self, frame: np.ndarray) -> list[Detection]:
         """Detect bright contour regions above the intensity threshold."""
@@ -78,32 +88,154 @@ class MockDetector(Detector):
         if frame is None or frame.size == 0:
             return detections
 
-        if frame.ndim == 3:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        x_offset, y_offset = 0, 0
+        working_frame = frame
+        if self.roi is not None:
+            ymin, ymax, xmin, xmax = self.roi
+            working_frame = working_frame[ymin:ymax, xmin:xmax]
+            x_offset, y_offset = xmin, ymin
+            if working_frame.size == 0:
+                return detections
+
+        if working_frame.ndim == 3:
+            gray = cv2.cvtColor(working_frame, cv2.COLOR_BGR2GRAY)
         else:
-            gray = frame
+            gray = working_frame
+
+        if self.apply_blur:
+            gray = cv2.GaussianBlur(gray, (7, 7), 0)
 
         _, thresh = cv2.threshold(
             gray, self.intensity_threshold, 255, cv2.THRESH_BINARY
         )
+
+        if self.morph_open:
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+            thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+
         contours, _ = cv2.findContours(
             thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
 
         for cnt in contours:
+            area = float(cv2.contourArea(cnt))
+            if self.min_area > 0 and area < self.min_area:
+                continue
+            if self.max_area is not None and area > self.max_area:
+                continue
+
             x, y, w, h = cv2.boundingRect(cnt)
             if float(w) > self.min_width and float(h) > self.min_height:
                 detections.append(
                     Detection(
-                        x1=float(x),
-                        y1=float(y),
-                        x2=float(x + w),
-                        y2=float(y + h),
+                        x1=float(x + x_offset),
+                        y1=float(y + y_offset),
+                        x2=float(x + w + x_offset),
+                        y2=float(y + h + y_offset),
                         confidence=self.min_confidence,
                         class_id=self.class_id,
                         class_name=self.class_name,
                     )
                 )
+        return detections
+
+
+class ShackleDetector(Detector):
+    """Specialized detector for industrial poultry on overhead shackle conveyor lines.
+
+    Analyzes vertical steel shackle brackets to locate regularly spaced shackle centers,
+    then frames each suspended chicken carcass with high spatial stability.
+    """
+
+    def __init__(
+        self,
+        min_confidence: float = 0.90,
+        shackle_y_ratio: tuple[float, float] = (0.24, 0.48),
+        min_spacing: float = 55.0,
+        chicken_width: float = 115.0,
+        chicken_height: float = 580.0,
+        chicken_y_top: float | None = 260.0,
+        chicken_y_top_ratio: float = 0.25,
+        class_name: str = "chicken",
+        class_id: int = 0,
+    ) -> None:
+        self.min_confidence = min_confidence
+        self.shackle_y_ratio = shackle_y_ratio
+        self.min_spacing = min_spacing
+        self.chicken_width = chicken_width
+        self.chicken_height = chicken_height
+        self.chicken_y_top = chicken_y_top
+        self.chicken_y_top_ratio = chicken_y_top_ratio
+        self.class_name = class_name
+        self.class_id = class_id
+
+    def predict(self, frame: np.ndarray) -> list[Detection]:
+        """Detect individual chickens on the shackle line with regular spacing."""
+        detections: list[Detection] = []
+        if frame is None or frame.size == 0:
+            return detections
+
+        h, w = frame.shape[:2]
+        y1_shackle = int(max(0.0, min(1.0, self.shackle_y_ratio[0])) * h)
+        y2_shackle = int(max(0.0, min(1.0, self.shackle_y_ratio[1])) * h)
+        if y2_shackle <= y1_shackle:
+            return detections
+
+        shackle_roi = frame[y1_shackle:y2_shackle, :]
+        if shackle_roi.ndim == 3:
+            gray = cv2.cvtColor(shackle_roi, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = shackle_roi
+
+        sobelx = np.abs(cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)).astype(np.uint8)
+        col_energy = cv2.GaussianBlur(
+            sobelx.mean(axis=0).reshape(1, -1), (25, 1), 0
+        ).flatten()
+
+        threshold = max(12.0, float(col_energy.mean() * 0.8))
+        peaks: list[int] = []
+        for i in range(1, len(col_energy) - 1):
+            if (
+                col_energy[i] > col_energy[i - 1]
+                and col_energy[i] > col_energy[i + 1]
+                and col_energy[i] > threshold
+            ):
+                peaks.append(i)
+
+        # Merge peaks closer than min_spacing (since a shackle bracket has 2 vertical bars)
+        centers: list[int] = []
+        for p in peaks:
+            if not centers:
+                centers.append(p)
+            elif (p - centers[-1]) < self.min_spacing:
+                centers[-1] = (centers[-1] + p) // 2
+            else:
+                centers.append(p)
+
+        y_top = (
+            self.chicken_y_top
+            if self.chicken_y_top is not None
+            else float(h * self.chicken_y_top_ratio)
+        )
+        box_w = float(self.chicken_width)
+        box_h = float(self.chicken_height)
+
+        for cx in centers:
+            x1 = max(0.0, float(cx - box_w / 2.0))
+            x2 = min(float(w), float(cx + box_w / 2.0))
+            y1 = max(0.0, float(y_top))
+            y2 = min(float(h), float(y_top + box_h))
+            detections.append(
+                Detection(
+                    x1=x1,
+                    y1=y1,
+                    x2=x2,
+                    y2=y2,
+                    confidence=self.min_confidence,
+                    class_id=self.class_id,
+                    class_name=self.class_name,
+                )
+            )
         return detections
 
 

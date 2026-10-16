@@ -12,6 +12,7 @@ from services.counter.src.detection.detector import (
     Detector,
     MockDetector,
     ONNXDetector,
+    ShackleDetector,
 )
 
 
@@ -264,3 +265,69 @@ def test_onnx_detector_edge_cases_and_options():
         mock_session.run.return_value = []
         frame = np.zeros((100, 100, 3), dtype=np.uint8)
         assert detector.predict(frame) == []
+
+
+def test_shackle_detector_empty_and_blank():
+    """Verify ShackleDetector handles None, empty, and flat zero-gradient frames."""
+    detector = ShackleDetector()
+    assert detector.predict(None) == []  # type: ignore[arg-type]
+    assert detector.predict(np.array([])) == []
+
+    flat_frame = np.full((1080, 1920, 3), 128, dtype=np.uint8)
+    assert detector.predict(flat_frame) == []
+
+
+def test_shackle_detector_detects_spaced_shackles():
+    """Verify ShackleDetector locates vertical bars and frames suspended objects."""
+    detector = ShackleDetector(
+        shackle_y_ratio=(0.20, 0.50),
+        min_spacing=50.0,
+        chicken_width=80.0,
+        chicken_height=300.0,
+        chicken_y_top=250.0,
+    )
+    frame = np.zeros((600, 800, 3), dtype=np.uint8)
+    # Draw three distinct vertical shackle bars in the shackle band y in [120, 300]
+    frame[150:280, 195:205] = 255
+    frame[150:280, 395:405] = 255
+    frame[150:280, 595:605] = 255
+
+    detections = detector.predict(frame)
+    assert len(detections) == 3
+    for det in detections:
+        assert isinstance(det, Detection)
+        assert det.class_name == "chicken"
+        assert det.confidence == 0.90
+        assert det.y1 == 250.0
+        assert det.y2 == 550.0
+
+    centers = [(d.x1 + d.x2) / 2.0 for d in detections]
+    assert pytest.approx(centers[0], abs=15) == 200.0
+    assert pytest.approx(centers[1], abs=15) == 400.0
+    assert pytest.approx(centers[2], abs=15) == 600.0
+
+
+def test_mock_detector_area_and_morph_filters():
+    """Verify MockDetector respects min_area, max_area, and morph_open."""
+    detector = MockDetector(
+        min_confidence=0.85,
+        min_width=5.0,
+        min_height=5.0,
+        min_area=100.0,
+        max_area=5000.0,
+        morph_open=True,
+    )
+    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+    # Small speckle (area 16) - below min_area
+    frame[50:54, 50:54] = 255
+    # Medium blob (area 900) - valid
+    frame[100:130, 100:130] = 255
+    # Huge background blob (area 10,000) - exceeds max_area
+    frame[200:300, 200:300] = 255
+
+    detections = detector.predict(frame)
+    assert len(detections) == 1
+    det = detections[0]
+    assert 95.0 <= det.x1 <= 105.0
+    assert 125.0 <= det.x2 <= 135.0
+
