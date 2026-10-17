@@ -15,7 +15,7 @@ export interface ReportRowItem {
 }
 
 export interface ReportsTableProps {
-  data: (ReportRowItem | AggregateItemDTO)[];
+  data?: (ReportRowItem | AggregateItemDTO)[];
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -39,7 +39,7 @@ function normalizeRow(item: ReportRowItem | AggregateItemDTO, index: number): Re
   return item;
 }
 
-export function ReportsTable({ data }: ReportsTableProps) {
+export function ReportsTable({ data = [] }: ReportsTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
 
   const normalizedRows = data.map((item, idx) => normalizeRow(item, idx));
@@ -132,11 +132,10 @@ export function ReportsTable({ data }: ReportsTableProps) {
                     </TableCell>
                     <TableCell className="text-slate-700 text-xs py-3.5">{Math.round(row.ratePerMin ?? 0)} cpm</TableCell>
                     <TableCell className="text-slate-700 text-xs py-3.5">
-                      {(row.accuracyPct ?? 99.2).toLocaleString("id-ID", {
+                      {`${(row.accuracyPct ?? 99.2).toLocaleString("id-ID", {
                         minimumFractionDigits: 1,
                         maximumFractionDigits: 1,
-                      })}
-                      %
+                      })}%`}
                     </TableCell>
                     <TableCell className="py-3.5">{getStatusBadge(row.status)}</TableCell>
                   </TableRow>
