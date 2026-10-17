@@ -110,6 +110,26 @@ def test_export_unsupported_format(pdf_client):
     assert res.json()["detail"] == "Unsupported format 'docx'. Only 'xlsx' and 'pdf' are supported."
 
 
+def test_export_pdf_report_all_lines(pdf_client):
+    for param in ("all", "semua", "", None):
+        url = "/api/v1/reports/export?format=pdf" if param is None else f"/api/v1/reports/export?line_id={param}&format=pdf"
+        res = pdf_client.get(url)
+        assert res.status_code == 200
+        assert res.headers["content-type"] == "application/pdf"
+        assert res.headers["content-disposition"] == 'attachment; filename="report_semua_lini.pdf"'
+        assert res.content.startswith(b"%PDF")
+
+
+def test_export_excel_report_all_lines(pdf_client):
+    for param in ("all", "semua", "", None):
+        url = "/api/v1/reports/export?format=xlsx" if param is None else f"/api/v1/reports/export?line_id={param}&format=xlsx"
+        res = pdf_client.get(url)
+        assert res.status_code == 200
+        assert "application/vnd.openxmlformats-officedocument" in res.headers["content-type"]
+        assert res.headers["content-disposition"] == 'attachment; filename="report_semua_lini.xlsx"'
+        assert len(res.content) > 0
+
+
 def test_pdf_report_generator_unit_empty_and_nulls():
     from services.api.src.services.pdf_exporter import PDFReportGenerator
 

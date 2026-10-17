@@ -27,7 +27,7 @@ def _parse_filter_datetime(dt_str: str) -> datetime:
 
 @router.get("/export")
 def export_report(
-    line_id: str = Query(default="lineA"),
+    line_id: str = Query(default="all"),
     format: str = Query(default="xlsx"),
     start_time: str | None = Query(default=None),
     end_time: str | None = Query(default=None),
@@ -40,7 +40,10 @@ def export_report(
             detail=f"Unsupported format '{format}'. Only 'xlsx' and 'pdf' are supported.",
         )
 
-    query = select(CountAggregate).where(CountAggregate.line_id == line_id)
+    is_all_lines = (line_id.lower().strip() in ("all", "semua", "")) if line_id else True
+    query = select(CountAggregate)
+    if not is_all_lines:
+        query = query.where(CountAggregate.line_id == line_id)
 
     if start_time is not None:
         start_dt = _parse_filter_datetime(start_time)
@@ -56,6 +59,7 @@ def export_report(
     records = [
         {
             "window_start": agg.window_start,
+            "line_id": agg.line_id,
             "count": agg.count,
             "rate_per_min": agg.rate_per_min,
             "status": agg.status,
@@ -63,20 +67,23 @@ def export_report(
         for agg in aggregates
     ]
 
+    display_line_name = "Semua Lini" if is_all_lines else line_id
+    safe_filename = "report_semua_lini" if is_all_lines else f"report_{line_id}"
+
     if fmt == "pdf":
         pdf_generator = PDFReportGenerator()
-        pdf_bytes = pdf_generator.generate_line_report(line_id=line_id, records=records)
+        pdf_bytes = pdf_generator.generate_line_report(line_id=display_line_name, records=records)
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="report_{line_id}.pdf"'},
+            headers={"Content-Disposition": f'attachment; filename="{safe_filename}.pdf"'},
         )
 
     generator = ExcelReportGenerator()
-    xlsx_bytes = generator.generate_line_report(line_id=line_id, records=records)
+    xlsx_bytes = generator.generate_line_report(line_id=display_line_name, records=records)
 
     return Response(
         content=xlsx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="report_{line_id}.xlsx"'},
+        headers={"Content-Disposition": f'attachment; filename="{safe_filename}.xlsx"'},
     )
