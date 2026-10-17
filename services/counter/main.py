@@ -834,6 +834,33 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def fetch_remote_line_config(
+    api_sync_url: str,
+    line_id: str,
+    timeout: float = 3.0,
+) -> dict | None:
+    """Fetches line configuration from central API on startup.
+    Returns None if unreachable or on error (enabling offline fallback).
+    """
+    try:
+        import httpx
+        # Deduce base URL from api_sync_url (e.g., http://host:port/api/v1/sync/batch -> http://host:port/api/v1/lines/{line_id})
+        if "/api/v1/" in api_sync_url:
+            base_api = api_sync_url.split("/api/v1/")[0] + "/api/v1"
+        else:
+            base_api = api_sync_url.rstrip("/")
+
+        target_url = f"{base_api}/lines/{line_id}"
+        resp = httpx.get(target_url, timeout=timeout)
+        if resp.status_code == 200:
+            return resp.json()
+        logger.warning("Remote line config returned HTTP %s for line %s", resp.status_code, line_id)
+        return None
+    except Exception as exc:
+        logger.info("Could not fetch remote line config (%s). Using local parameters.", exc)
+        return None
+
+
 def main(argv: Optional[Sequence[str]] = None) -> None:
     """Entrypoint reading configuration from CLI arguments or environment variables and running service."""
     args = parse_args(argv)
@@ -849,8 +876,23 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    video_source_type = "file" if args.video else args.source
     enable_sync = not args.no_sync
+
+    # Remote config startup pull
+    if enable_sync and args.api_sync_url:
+        remote_config = fetch_remote_line_config(args.api_sync_url, args.line_id)
+        if remote_config:
+            if not args.video and remote_config.get("video_url"):
+                args.video = remote_config["video_url"]
+                logger.info("[RemoteConfig] Applied video source: %s", args.video)
+            if not args.line and remote_config.get("line_coords"):
+                args.line = remote_config["line_coords"]
+                logger.info("[RemoteConfig] Applied line coordinates: %s", args.line)
+            if (not os.getenv("LINE_DIRECTION") or args.direction == "down") and remote_config.get("line_direction"):
+                args.direction = remote_config["line_direction"]
+                logger.info("[RemoteConfig] Applied line direction: %s", args.direction)
+
+    video_source_type = "file" if args.video else args.source
 
     # Parse line coordinates if provided
     line_coords = None
