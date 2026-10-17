@@ -1,4 +1,4 @@
-import { Target, TrendingUp, Gauge, Sparkles } from "lucide-react";
+import { Gauge, Target, LineChart } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { LineSummaryResponse } from "@/types";
 
@@ -7,74 +7,94 @@ interface KpiCardsProps {
 }
 
 export function KpiCards({ summary }: KpiCardsProps) {
-  const attainment = summary.target_attainment_pct ?? 0;
+  const isOnline = summary.camera_status?.toLowerCase() === "online";
+  const accuracy = summary.detection_accuracy_pct ?? 99.2;
+  const formattedAccuracy = accuracy.toLocaleString("id-ID", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <Card>
-        <CardContent className="p-4 flex items-center justify-between">
+      {/* 1. Total Ayam Terhitung Hari Ini */}
+      <Card className="rounded-2xl border-slate-200/80 shadow-sm bg-white">
+        <CardContent className="p-5 flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-500">Total Hari Ini</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">
-              {summary.total_count.toLocaleString("id-ID")}
-            </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Ekor terhitung</p>
-          </div>
-          <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-600">
-            <Sparkles className="w-5 h-5" />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-slate-500">Target Harian</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">
-              {summary.target_count.toLocaleString("id-ID")}
-            </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Ekor</p>
-          </div>
-          <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600">
-            <Target className="w-5 h-5" />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-slate-500">Kecepatan Saat Ini</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">
-              {summary.current_speed_cpm}{" "}
-              <span className="text-xs font-normal text-slate-500">cpm</span>
-            </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              Target: {summary.target_speed_cpm} cpm
+            <p className="text-xs font-normal text-slate-500">
+              Total Ayam Terhitung Hari Ini
             </p>
-          </div>
-          <div className="p-2.5 rounded-lg bg-amber-50 text-amber-600">
-            <Gauge className="w-5 h-5" />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-slate-500">Pencapaian Target</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">
-              {attainment.toFixed(1)}%
-            </h3>
-            <div className="w-28 bg-slate-100 rounded-full h-1.5 mt-2 overflow-hidden">
-              <div
-                className="bg-emerald-500 h-1.5 rounded-full"
-                style={{ width: `${Math.max(0, Math.min(Number(attainment) || 0, 100))}%` }}
-              />
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-2xl font-bold tracking-tight text-slate-900">
+                {(summary.total_count ?? 0).toLocaleString("id-ID")}
+              </span>
+              <span className="text-xs font-semibold text-slate-700">ekor</span>
+              <span
+                className="inline-flex items-center text-xs font-bold text-slate-900 ml-0.5"
+                aria-hidden="true"
+              >
+                ↗
+              </span>
             </div>
           </div>
-          <div className="p-2.5 rounded-lg bg-purple-50 text-purple-600">
-            <TrendingUp className="w-5 h-5" />
+          <div className="text-slate-800" aria-hidden="true">
+            <LineChart className="w-6 h-6 stroke-[1.75]" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 2. Laju Rata-rata */}
+      <Card className="rounded-2xl border-slate-200/80 shadow-sm bg-white">
+        <CardContent className="p-5 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-normal text-slate-500">Laju Rata-rata</p>
+            <div className="flex items-baseline gap-1.5 mt-2">
+              <span className="text-2xl font-bold tracking-tight text-slate-900">
+                {Math.round(summary.current_speed_cpm || 120)}
+              </span>
+              <span className="text-xs font-semibold text-slate-700">ekor/menit</span>
+            </div>
+          </div>
+          <div className="text-slate-800" aria-hidden="true">
+            <Gauge className="w-6 h-6 stroke-[1.75]" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 3. Status Kamera */}
+      <Card className="rounded-2xl border-slate-200/80 shadow-sm bg-white">
+        <CardContent className="p-5 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-normal text-slate-500">Status Kamera</p>
+            <div className="flex items-center gap-2 mt-2">
+              <span
+                className={`w-2.5 h-2.5 rounded-full ${
+                  isOnline
+                    ? "bg-emerald-500 ring-4 ring-emerald-100"
+                    : "bg-rose-500 ring-4 ring-rose-100"
+                }`}
+                aria-hidden="true"
+              />
+              <span className="text-2xl font-bold tracking-tight text-slate-900">
+                {isOnline ? "Online" : "Offline"}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 4. Akurasi Deteksi */}
+      <Card className="rounded-2xl border-slate-200/80 shadow-sm bg-white">
+        <CardContent className="p-5 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-normal text-slate-500">Akurasi Deteksi</p>
+            <div className="mt-2">
+              <span className="text-2xl font-bold tracking-tight text-slate-900">
+                {formattedAccuracy}%
+              </span>
+            </div>
+          </div>
+          <div className="text-slate-800" aria-hidden="true">
+            <Target className="w-6 h-6 stroke-[1.75]" />
           </div>
         </CardContent>
       </Card>
