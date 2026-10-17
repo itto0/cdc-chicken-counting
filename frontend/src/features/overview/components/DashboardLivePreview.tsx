@@ -22,6 +22,28 @@ export function DashboardLivePreview({
 }: DashboardLivePreviewProps) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [imgError, setImgError] = useState(false);
+  const [clock, setClock] = useState(() =>
+    new Date().toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    })
+  );
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setClock(
+        new Date().toLocaleTimeString("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        })
+      );
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     setImgError(false);
@@ -101,7 +123,7 @@ export function DashboardLivePreview({
           </div>
 
           <div className="text-[11px] text-slate-300 font-mono">
-            19:39 / 18:35
+            {clock}
           </div>
         </div>
       </div>

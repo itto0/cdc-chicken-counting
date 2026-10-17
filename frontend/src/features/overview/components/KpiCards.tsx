@@ -7,7 +7,22 @@ interface KpiCardsProps {
 }
 
 export function KpiCards({ summary }: KpiCardsProps) {
-  const isOnline = summary.camera_status?.toLowerCase() === "online";
+  const status = (summary.camera_status ?? "offline").toLowerCase();
+  const isOnline = status === "online";
+  const isDegraded = status === "degraded";
+
+  const statusDotClass = isOnline
+    ? "bg-emerald-500 ring-4 ring-emerald-100"
+    : isDegraded
+    ? "bg-amber-500 ring-4 ring-amber-100"
+    : "bg-rose-500 ring-4 ring-rose-100";
+
+  const statusLabel = isOnline
+    ? "Online"
+    : isDegraded
+    ? "Degraded"
+    : "Offline";
+
   const accuracy = summary.detection_accuracy_pct ?? 99.2;
   const formattedAccuracy = accuracy.toLocaleString("id-ID", {
     minimumFractionDigits: 1,
@@ -67,15 +82,11 @@ export function KpiCards({ summary }: KpiCardsProps) {
             <p className="text-xs font-normal text-slate-500">Status Kamera</p>
             <div className="flex items-center gap-2 mt-2">
               <span
-                className={`w-2.5 h-2.5 rounded-full ${
-                  isOnline
-                    ? "bg-emerald-500 ring-4 ring-emerald-100"
-                    : "bg-rose-500 ring-4 ring-rose-100"
-                }`}
+                className={`w-2.5 h-2.5 rounded-full ${statusDotClass}`}
                 aria-hidden="true"
               />
               <span className="text-2xl font-bold tracking-tight text-slate-900">
-                {isOnline ? "Online" : "Offline"}
+                {statusLabel}
               </span>
             </div>
           </div>

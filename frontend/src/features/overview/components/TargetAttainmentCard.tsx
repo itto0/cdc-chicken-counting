@@ -17,8 +17,9 @@ export function TargetAttainmentCard({
       : target > 0
         ? (total / target) * 100
         : 0;
-  const percentage = Math.min(Math.max(Math.round(calculatedPct), 0), 100);
-  const targetFormatted = (target || 62000).toLocaleString("id-ID");
+  const displayPercentage = Math.round(calculatedPct);
+  const percentage = Math.min(Math.max(displayPercentage, 0), 100);
+  const targetFormatted = (target || 60000).toLocaleString("id-ID");
 
   // SVG circular gauge math
   const radius = 38;
@@ -71,7 +72,7 @@ export function TargetAttainmentCard({
               />
             </svg>
             <span className="absolute text-lg font-bold text-slate-800">
-              {percentage}%
+              {displayPercentage}%
             </span>
           </div>
 

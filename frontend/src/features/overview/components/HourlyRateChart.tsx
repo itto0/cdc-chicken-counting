@@ -3,12 +3,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { AggregateItemDTO } from "@/types";
 
 interface HourlyRateChartProps {
-  data: AggregateItemDTO[];
+  data?: AggregateItemDTO[];
 }
 
-export function HourlyRateChart({ data }: HourlyRateChartProps) {
-  const times = data.map((d) => d.bucket);
-  const counts = data.map((d) => d.count);
+export function HourlyRateChart({ data = [] }: HourlyRateChartProps) {
+  const formatBucketHour = (bucket: string) => {
+    if (!bucket) return "";
+    if (bucket.includes("T")) {
+      return bucket.split("T")[1].slice(0, 5);
+    }
+    return bucket;
+  };
+  const times = (data ?? []).map((d) => formatBucketHour(d.bucket));
+  const counts = (data ?? []).map((d) => d.count);
 
   // Fallback demo points mimicking the mockup's smooth wave if empty
   const defaultTimes = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
