@@ -40,12 +40,30 @@ export const reportsApi = {
 
     const res = await fetch(targetUrl, { headers });
     if (!res.ok) {
-      throw new Error(`Gagal mengunduh laporan (${res.status} ${res.statusText})`);
+      let errorDetail = "";
+      try {
+        const errorJson = await res.json();
+        if (typeof errorJson.detail === "string") {
+          errorDetail = errorJson.detail;
+        } else if (errorJson.detail) {
+          errorDetail = JSON.stringify(errorJson.detail);
+        } else if (typeof errorJson.message === "string") {
+          errorDetail = errorJson.message;
+        }
+      } catch {
+        // ignore JSON parse error
+      }
+      throw new Error(
+        errorDetail
+          ? `Gagal mengunduh laporan: ${errorDetail}`
+          : `Gagal mengunduh laporan (${res.status} ${res.statusText})`
+      );
     }
 
     const blob = await res.blob();
     const disposition = res.headers.get("content-disposition");
-    let filename = `report_${lineId || "semua_lini"}.${format}`;
+    const lineTag = lineId && lineId !== "all" ? lineId : "semua_lini";
+    let filename = `report_${lineTag}.${format}`;
     if (disposition && disposition.includes("filename=")) {
       const match = disposition.match(/filename=["']?([^"';]+)["']?/);
       if (match && match[1]) {
@@ -58,8 +76,11 @@ export const reportsApi = {
     link.href = url;
     link.download = filename;
     document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    try {
+      link.click();
+    } finally {
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
   },
 };
