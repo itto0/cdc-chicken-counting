@@ -9,6 +9,17 @@ init_env()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///api_central.db")
 
+# If PostgreSQL URL is provided without an explicit driver dialect, check for psycopg or psycopg2
+if DATABASE_URL.startswith("postgresql://"):
+    try:
+        import psycopg  # noqa: F401
+    except ImportError:
+        try:
+            import psycopg2  # noqa: F401
+            DATABASE_URL = "postgresql+psycopg2://" + DATABASE_URL[len("postgresql://"):]
+        except ImportError:
+            pass
+
 connect_args = {}
 engine_kwargs = {}
 if DATABASE_URL.startswith("sqlite"):

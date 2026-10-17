@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir \
     "uvicorn[standard]>=0.28.0" \
     "sqlalchemy>=2.0.0" \
     "psycopg2-binary>=2.9.9" \
+    "psycopg[binary]>=3.1.18" \
     "pydantic>=2.5.0" \
     "httpx>=0.27.0" \
     "openpyxl>=3.1.0" \
