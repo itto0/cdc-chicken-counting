@@ -753,7 +753,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--direction",
-        default=os.getenv("LINE_DIRECTION", "down"),
+        default=os.getenv("LINE_DIRECTION") or None,
         choices=["down", "up", "left", "right", "in", "out"],
         help="Line crossing direction (default: down)",
     )
@@ -881,6 +881,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     enable_sync = not args.no_sync
 
     # Remote config startup pull
+    remote_config = None
     if enable_sync and args.api_sync_url:
         remote_config = fetch_remote_line_config(args.api_sync_url, args.line_id)
         if remote_config:
@@ -890,9 +891,13 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             if not args.line and remote_config.get("line_coords"):
                 args.line = remote_config["line_coords"]
                 logger.info("[RemoteConfig] Applied line coordinates: %s", args.line)
-            if not os.getenv("LINE_DIRECTION") and args.direction == "down" and remote_config.get("line_direction"):
-                args.direction = remote_config["line_direction"]
-                logger.info("[RemoteConfig] Applied line direction: %s", args.direction)
+
+    if args.direction is None:
+        if remote_config and remote_config.get("line_direction"):
+            args.direction = remote_config["line_direction"]
+            logger.info("[RemoteConfig] Applied line direction: %s", args.direction)
+        else:
+            args.direction = "down"
 
     video_source_type = "file" if args.video else args.source
 

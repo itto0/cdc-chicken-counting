@@ -21,9 +21,10 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/context/AppContext";
-import { AddLineModal } from "../components/AddLineModal";
+import { AddLineModal, parseApiErrorMessage } from "../components/AddLineModal";
 import type { CreateLinePayload, Line } from "@/types";
 
 const DIRECTION_LABELS: Record<string, string> = {
@@ -54,6 +55,9 @@ export default function PengaturanPage() {
 
   const [lineName, setLineName] = useState(currentLine?.name || "Lini Konveyor 1");
   const [dailyTarget, setDailyTarget] = useState<number | string>(currentLine?.daily_target || 60000);
+  const [videoUrl, setVideoUrl] = useState(currentLine?.video_url || "");
+  const [lineCoords, setLineCoords] = useState(currentLine?.line_coords || "0,240,640,240");
+  const [lineDirection, setLineDirection] = useState(currentLine?.line_direction || "down");
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -72,8 +76,12 @@ export default function PengaturanPage() {
 
   useEffect(() => {
     if (currentLine) {
-      setLineName(currentLine.name || "Lini Konveyor 1");
-      setDailyTarget(currentLine.daily_target || 60000);
+      setLineName(currentLine.name || "");
+      setDailyTarget(currentLine.daily_target ?? 60000);
+      setVideoUrl(currentLine.video_url || "");
+      setLineCoords(currentLine.line_coords || "0,240,640,240");
+      setLineDirection(currentLine.line_direction || "down");
+      setSaveError(null);
     }
   }, [currentLine]);
 
@@ -93,24 +101,28 @@ export default function PengaturanPage() {
       return;
     }
 
+    if (lineCoords.trim()) {
+      const parts = lineCoords.split(",").map((p) => p.trim());
+      if (parts.length !== 4 || parts.some((p) => p === "" || isNaN(Number(p)))) {
+        setSaveError("Koordinat garis harus berisi 4 angka dipisahkan koma (contoh: 0,240,640,240)");
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       await updateLine(currentLine.id, {
         name: trimmedName,
         daily_target: target,
+        video_url: videoUrl.trim() || null,
+        line_coords: lineCoords.trim() || null,
+        line_direction: lineDirection,
       });
       setIsSaved(true);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setIsSaved(false), 2500);
     } catch (err: unknown) {
-      let msg = "Gagal menyimpan konfigurasi lini";
-      if (err && typeof err === "object") {
-        const errorObj = err as Record<string, unknown>;
-        if (errorObj.message && typeof errorObj.message === "string") {
-          msg = errorObj.message;
-        }
-      }
-      setSaveError(msg);
+      setSaveError(parseApiErrorMessage(err, "Gagal menyimpan konfigurasi lini"));
     } finally {
       setIsSaving(false);
     }
@@ -122,14 +134,7 @@ export default function PengaturanPage() {
       setActionError(null);
       await updateLine(line.id, { is_active: !line.is_active });
     } catch (err: unknown) {
-      let msg = `Gagal mengubah status lini ${line.id}`;
-      if (err && typeof err === "object") {
-        const errorObj = err as Record<string, unknown>;
-        if (errorObj.message && typeof errorObj.message === "string") {
-          msg = errorObj.message;
-        }
-      }
-      setActionError(msg);
+      setActionError(parseApiErrorMessage(err, `Gagal mengubah status lini ${line.id}`));
     } finally {
       setTogglingId(null);
     }
@@ -154,7 +159,7 @@ export default function PengaturanPage() {
           <CardHeader>
             <CardTitle>Parameter Lini Produksi</CardTitle>
             <CardDescription>
-              Ubah konfigurasi nama lini dan kuota target harian
+              Ubah konfigurasi parameter lini, target kuota, kamera, dan garis virtual
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleSave}>
@@ -169,7 +174,7 @@ export default function PengaturanPage() {
                   htmlFor="line-name-input"
                   className="text-xs font-medium text-slate-700 block mb-1"
                 >
-                  Nama Lini
+                  Nama Lini <span className="text-rose-500">*</span>
                 </label>
                 <Input
                   id="line-name-input"
@@ -185,7 +190,7 @@ export default function PengaturanPage() {
                   htmlFor="daily-target-input"
                   className="text-xs font-medium text-slate-700 block mb-1"
                 >
-                  Target Harian (ekor ayam)
+                  Target Harian (ekor ayam) <span className="text-rose-500">*</span>
                 </label>
                 <Input
                   id="daily-target-input"
@@ -198,6 +203,77 @@ export default function PengaturanPage() {
                   min={1}
                   required
                 />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="video-url-input"
+                  className="text-xs font-medium text-slate-700 block mb-1"
+                >
+                  URL Stream Video / Kamera
+                </label>
+                <Input
+                  id="video-url-input"
+                  value={videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
+                  placeholder="rtsp://192.168.1.100:554/stream1 atau /samples/video.mp4"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Opsional. Digunakan untuk live streaming kamera di cloud atau edge source.
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="line-coords-input"
+                  className="text-xs font-medium text-slate-700 block"
+                >
+                  Koordinat Garis Virtual (x1, y1, x2, y2)
+                </label>
+                <Input
+                  id="line-coords-input"
+                  value={lineCoords}
+                  onChange={(e) => setLineCoords(e.target.value)}
+                  placeholder="0,240,640,240"
+                />
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setLineCoords("0,240,640,240")}
+                    className="px-2.5 py-1 text-[11px] bg-slate-100 text-slate-600 rounded-md hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer"
+                  >
+                    Preset Horizontal Tengah (0,240,640,240)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLineCoords("320,0,320,480")}
+                    className="px-2.5 py-1 text-[11px] bg-slate-100 text-slate-600 rounded-md hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer"
+                  >
+                    Preset Vertikal Tengah (320,0,320,480)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="line-direction-select"
+                  className="text-xs font-medium text-slate-700 block mb-1"
+                >
+                  Arah Hitung
+                </label>
+                <Select
+                  id="line-direction-select"
+                  value={lineDirection}
+                  onChange={(e) => setLineDirection(e.target.value)}
+                  className="w-full text-xs"
+                >
+                  <option value="down">Ke Bawah (Down)</option>
+                  <option value="up">Ke Atas (Up)</option>
+                  <option value="right">Ke Kanan (Right)</option>
+                  <option value="left">Ke Kiri (Left)</option>
+                  <option value="in">Masuk (In)</option>
+                  <option value="out">Keluar (Out)</option>
+                </Select>
               </div>
             </CardContent>
             <CardFooter className="flex justify-between items-center">

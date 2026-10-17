@@ -309,6 +309,10 @@ def test_update_line_field_length_limits(lines_client):
     resp = client.put("/api/v1/lines/line-1", json={"name": ""})
     assert resp.status_code == 422
 
+    # Name whitespace-only string
+    resp_ws = client.put("/api/v1/lines/line-1", json={"name": "   "})
+    assert resp_ws.status_code == 422
+
     # Name too long (>100 chars)
     resp = client.put("/api/v1/lines/line-1", json={"name": "x" * 101})
     assert resp.status_code == 422
@@ -320,6 +324,18 @@ def test_update_line_field_length_limits(lines_client):
     # Line coords too long (>100 chars)
     resp = client.put("/api/v1/lines/line-1", json={"line_coords": "1," * 51})
     assert resp.status_code == 422
+
+
+def test_create_line_whitespace_name_rejected(lines_client):
+    client = lines_client
+    # Name whitespace-only on create rejected with 422
+    resp = client.post("/api/v1/lines", json={
+        "id": "line-ws-name",
+        "name": "   \t \n ",
+        "daily_target": 50000,
+    })
+    assert resp.status_code == 422
+
 
 
 

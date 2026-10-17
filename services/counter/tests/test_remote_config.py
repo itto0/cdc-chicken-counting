@@ -174,3 +174,51 @@ def test_main_startup_remote_config_cli_direction_precedence(monkeypatch):
         assert kwargs["line_direction"] == "up"
 
 
+def test_main_startup_remote_config_cli_direction_down_not_overwritten(monkeypatch):
+    """Explicit CLI --direction down is NOT overwritten even if remote config provides another direction."""
+    from services.counter.main import main
+
+    monkeypatch.setenv("LINE_ID", "line-remote")
+    monkeypatch.setenv("API_SYNC_URL", "http://central:8000/api/v1/sync/batch")
+    monkeypatch.delenv("LINE_DIRECTION", raising=False)
+
+    mock_remote_config = {
+        "id": "line-remote",
+        "video_url": "rtsp://remote/stream",
+        "line_coords": "100,200,300,400",
+        "line_direction": "left",
+    }
+
+    with patch("services.counter.main.fetch_remote_line_config", return_value=mock_remote_config), \
+         patch("services.counter.main.CounterService") as mock_service_cls:
+        mock_instance = MagicMock()
+        mock_service_cls.return_value = mock_instance
+
+        main(["--direction", "down"])
+
+        mock_service_cls.assert_called_once()
+        kwargs = mock_service_cls.call_args.kwargs
+        assert kwargs["line_direction"] == "down"
+
+
+def test_main_startup_direction_fallback_to_down_when_no_remote_config(monkeypatch):
+    """When direction is omitted and remote config has no direction, fallback to 'down'."""
+    from services.counter.main import main
+
+    monkeypatch.setenv("LINE_ID", "line-remote")
+    monkeypatch.setenv("API_SYNC_URL", "http://central:8000/api/v1/sync/batch")
+    monkeypatch.delenv("LINE_DIRECTION", raising=False)
+
+    with patch("services.counter.main.fetch_remote_line_config", return_value=None), \
+         patch("services.counter.main.CounterService") as mock_service_cls:
+        mock_instance = MagicMock()
+        mock_service_cls.return_value = mock_instance
+
+        main([])
+
+        mock_service_cls.assert_called_once()
+        kwargs = mock_service_cls.call_args.kwargs
+        assert kwargs["line_direction"] == "down"
+
+
+

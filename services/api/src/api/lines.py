@@ -40,6 +40,14 @@ class LineCreatePayload(BaseModel):
     line_direction: str = Field("down")
     is_active: bool = True
 
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("name must not be empty or whitespace only")
+        return v
+
     @field_validator("id")
     @classmethod
     def validate_id_slug(cls, v: str) -> str:
@@ -69,6 +77,16 @@ class LineUpdatePayload(BaseModel):
     line_coords: Optional[str] = Field(None, max_length=100)
     line_direction: Optional[str] = None
     is_active: Optional[bool] = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            raise ValueError("name must not be empty or whitespace only")
+        return v
 
     @field_validator("line_coords")
     @classmethod

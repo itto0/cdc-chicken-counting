@@ -11,6 +11,41 @@ export interface AddLineModalProps {
   onSubmit: (payload: CreateLinePayload) => Promise<void>;
 }
 
+export function parseApiErrorMessage(err: unknown, fallback: string = "Terjadi kesalahan"): string {
+  let msg = fallback;
+  if (err instanceof Error) {
+    const raw = err.message.replace(/^API Error \d+:\s*/, "");
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed?.detail)) {
+        msg = parsed.detail.map((d: { msg?: string }) => d.msg || "Validasi gagal").join(", ");
+      } else if (typeof parsed?.detail === "string") {
+        msg = parsed.detail;
+      } else if (typeof parsed?.message === "string") {
+        msg = parsed.message;
+      } else {
+        msg = raw;
+      }
+    } catch {
+      msg = raw || err.message;
+    }
+  } else if (err && typeof err === "object") {
+    const errorObj = err as Record<string, unknown>;
+    const response = errorObj.response as Record<string, unknown> | undefined;
+    const resData = response?.data as Record<string, unknown> | undefined;
+    if (resData?.detail && typeof resData.detail === "string") {
+      msg = resData.detail;
+    } else if (resData?.message && typeof resData.message === "string") {
+      msg = resData.message;
+    } else if (errorObj.detail && typeof errorObj.detail === "string") {
+      msg = errorObj.detail;
+    } else if (errorObj.message && typeof errorObj.message === "string") {
+      msg = errorObj.message;
+    }
+  }
+  return msg;
+}
+
 export function AddLineModal({ isOpen, onClose, onSubmit }: AddLineModalProps) {
   const [id, setId] = useState("");
   const [name, setName] = useState("");
@@ -101,38 +136,7 @@ export function AddLineModal({ isOpen, onClose, onSubmit }: AddLineModalProps) {
       resetForm();
       onClose();
     } catch (err: unknown) {
-      let msg = "Gagal membuat lini baru";
-      if (err instanceof Error) {
-        const raw = err.message.replace(/^API Error \d+:\s*/, "");
-        try {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed?.detail)) {
-            msg = parsed.detail.map((d: { msg?: string }) => d.msg || "Validasi gagal").join(", ");
-          } else if (typeof parsed?.detail === "string") {
-            msg = parsed.detail;
-          } else if (typeof parsed?.message === "string") {
-            msg = parsed.message;
-          } else {
-            msg = raw;
-          }
-        } catch {
-          msg = raw || err.message;
-        }
-      } else if (err && typeof err === "object") {
-        const errorObj = err as Record<string, unknown>;
-        const response = errorObj.response as Record<string, unknown> | undefined;
-        const resData = response?.data as Record<string, unknown> | undefined;
-        if (resData?.detail && typeof resData.detail === "string") {
-          msg = resData.detail;
-        } else if (resData?.message && typeof resData.message === "string") {
-          msg = resData.message;
-        } else if (errorObj.detail && typeof errorObj.detail === "string") {
-          msg = errorObj.detail;
-        } else if (errorObj.message && typeof errorObj.message === "string") {
-          msg = errorObj.message;
-        }
-      }
-      setErrorMsg(msg);
+      setErrorMsg(parseApiErrorMessage(err, "Gagal membuat lini baru"));
     } finally {
       setIsSubmitting(false);
     }
