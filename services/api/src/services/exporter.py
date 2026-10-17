@@ -80,7 +80,8 @@ class ExcelReportGenerator:
                 rate = 0.0
             status = r.get("status") or "NORMAL"
 
-            row_values = [ts_str, line_id, cnt, rate, status]
+            row_line_id = r.get("line_id") or line_id
+            row_values = [ts_str, row_line_id, cnt, rate, status]
             ws.append(row_values)
             ws.row_dimensions[row_idx].height = 20
 
