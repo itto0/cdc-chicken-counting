@@ -26,10 +26,10 @@ export function getBaseUrl(): string {
     typeof globalThis !== "undefined"
       ? (globalThis as unknown as { process?: { env?: Record<string, string> } }).process
       : undefined;
-  if (globalProcess?.env?.VITE_API_BASE_URL) {
+  if (globalProcess?.env?.VITE_API_BASE_URL !== undefined) {
     return globalProcess.env.VITE_API_BASE_URL;
   }
-  return "http://localhost:8000";
+  return "";
 }
 
 /**
