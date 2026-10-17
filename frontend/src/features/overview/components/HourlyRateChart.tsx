@@ -1,5 +1,5 @@
 import ReactECharts from "echarts-for-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import type { AggregateItemDTO } from "@/types";
 
 interface HourlyRateChartProps {
@@ -9,7 +9,13 @@ interface HourlyRateChartProps {
 export function HourlyRateChart({ data }: HourlyRateChartProps) {
   const times = data.map((d) => d.bucket);
   const counts = data.map((d) => d.count);
-  const rates = data.map((d) => d.rate_per_min);
+
+  // Fallback demo points mimicking the mockup's smooth wave if empty
+  const defaultTimes = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
+  const defaultCounts = [120, 280, 240, 390, 310, 520, 380, 420, 260, 410];
+
+  const chartTimes = times.length > 0 ? times : defaultTimes;
+  const chartCounts = counts.length > 0 ? counts : defaultCounts;
 
   const option = {
     tooltip: {
@@ -17,66 +23,73 @@ export function HourlyRateChart({ data }: HourlyRateChartProps) {
       backgroundColor: "#ffffff",
       borderColor: "#e2e8f0",
       textStyle: { color: "#0f172a", fontSize: 12 },
-    },
-    legend: {
-      data: ["Jumlah Ayam", "Kecepatan (cpm)"],
-      bottom: 0,
-      textStyle: { color: "#64748b" },
+      formatter: "{b}<br /><span style='font-weight:600;'>{c} ekor</span>",
     },
     grid: {
-      top: "12%",
-      left: "3%",
-      right: "4%",
-      bottom: "15%",
+      top: "10%",
+      left: "2%",
+      right: "2%",
+      bottom: "5%",
       containLabel: true,
     },
     xAxis: {
       type: "category",
-      data: times.length > 0 ? times : ["08:00", "09:00", "10:00", "11:00", "12:00"],
-      axisLine: { lineStyle: { color: "#cbd5e1" } },
-      axisLabel: { color: "#64748b" },
+      data: chartTimes,
+      boundaryGap: false,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: "#94a3b8", fontSize: 11 },
     },
-    yAxis: [
-      {
-        type: "value",
-        name: "Jumlah (ekor)",
-        splitLine: { lineStyle: { color: "#f1f5f9" } },
-        axisLabel: { color: "#64748b" },
+    yAxis: {
+      type: "value",
+      splitLine: {
+        show: true,
+        lineStyle: { color: "#f1f5f9", width: 1 },
       },
-      {
-        type: "value",
-        name: "cpm",
-        splitLine: { show: false },
-        axisLabel: { color: "#64748b" },
-      },
-    ],
+      axisLabel: { show: false },
+    },
     series: [
       {
-        name: "Jumlah Ayam",
-        type: "bar",
-        data: counts.length > 0 ? counts : [5120, 6840, 7210, 6950, 2100],
-        itemStyle: { color: "#10b981", borderRadius: [4, 4, 0, 0] },
-      },
-      {
-        name: "Kecepatan (cpm)",
+        name: "Penghitungan",
         type: "line",
-        yAxisIndex: 1,
-        smooth: true,
-        data: rates.length > 0 ? rates : [102, 124, 128, 122, 45],
-        itemStyle: { color: "#3b82f6" },
-        lineStyle: { width: 3 },
+        smooth: 0.5,
+        symbol: "none",
+        data: chartCounts,
+        lineStyle: {
+          color: "#2563eb",
+          width: 2.5,
+        },
+        areaStyle: {
+          color: {
+            type: "linear",
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: "rgba(37, 99, 235, 0.22)" },
+              { offset: 1, color: "rgba(37, 99, 235, 0.0)" },
+            ],
+          },
+        },
       },
     ],
   };
 
   return (
-    <Card className="mt-4">
-      <CardHeader>
-        <CardTitle>Laju Penghitungan per Jam</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[320px] w-full">
-          <ReactECharts option={option} notMerge={true} style={{ height: "100%", width: "100%" }} />
+    <Card className="rounded-2xl border-slate-200/80 shadow-sm bg-white">
+      <div className="p-5 pb-0">
+        <h3 className="text-sm font-semibold text-slate-800">
+          Tren Penghitungan per Jam
+        </h3>
+      </div>
+      <CardContent className="p-4 pt-1">
+        <div className="h-[210px] w-full">
+          <ReactECharts
+            option={option}
+            notMerge={true}
+            style={{ height: "100%", width: "100%" }}
+          />
         </div>
       </CardContent>
     </Card>
