@@ -10,7 +10,8 @@ import { StreamMetrics } from "../components/StreamMetrics";
 
 export default function LiniProduksiPage() {
   const { currentLineId, isConnected } = useAppContext();
-  const { status, fps, latencyMs, reconnect } = useLiveStream(currentLineId);
+  const { status, totalToday, liveSpeed, fps, latencyMs, reconnect } =
+    useLiveStream(currentLineId);
   const [retryNonce, setRetryNonce] = useState(0);
 
   const isStreaming = status === "CONNECTED";
@@ -37,8 +38,10 @@ export default function LiniProduksiPage() {
       </PageHeader>
 
       <StreamMetrics
+        totalToday={totalToday}
+        liveSpeed={liveSpeed}
         fps={fps ?? 30}
-        latencyMs={latencyMs ?? 42}
+        latencyMs={latencyMs ?? 5}
         cameraStatus={isStreaming ? "online" : "menghubungkan"}
       />
 

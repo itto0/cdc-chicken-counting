@@ -13,7 +13,7 @@ This PRD covers only two software products:
 
 ### 1.2 Out of Scope
 
-ERP/database integration connector, full cloud management platform (multi-site, OTA updates, fleet management), ML training pipeline and labeling tooling, hardware, cabling, network and lighting. These are separate work items. Where the dashboard needs data, this PRD defines a **minimal Data API** (section 6) that those items can later extend.
+ERP/database integration connector, advanced fleet management (remote software updates, staged model rollout), ML training pipeline and labeling tooling, hardware, cabling, network and lighting. These are separate work items. Where the dashboard needs data, this PRD defines a **minimal Data API** (section 6) that those items can later extend.
 
 ### 1.3 Problem
 
@@ -49,12 +49,16 @@ Manual counting of broilers on a moving shackle line causes double counts and om
 ## 2. System Context
 
 ```
-[IP Camera] --RTSP--> [Counting Service (edge)] --local DB--> [Data API] --> [Dashboard (web/mobile)]
-                              |
-                    (local admin / calibration UI)
+PLANT (per line)                                 VM / CLOUD (shared)
+[IP Camera] --RTSP--> [Counting Service + local SQLite outbox]
+                                  |  outbound HTTPS only (TLS, device token)
+                                  v
+                           [Data API] <--> [PostgreSQL]
+                                  ^
+[IP Camera 2] --> [Counting Service 2] ---+      [Dashboard (web/mobile)] --> Data API
 ```
 
-The Counting Service writes counts to a local database. The Data API (hosted on the edge device for phase 1, or in a cloud later) serves the Dashboard. This keeps the dashboard working on the plant LAN/Wi-Fi even without internet.
+Each edge device runs only the Counting Service. It writes to a local SQLite buffer, and a sync agent pushes counts, health telemetry and alarms to the central Data API over outbound HTTPS. The Data API, PostgreSQL database and Dashboard are hosted on a VM or cloud from day one and serve every line, so adding a line means adding an edge device, not a new stack. Edge devices open no inbound ports. Counting continues when the link is down and catches up afterwards (section 6.1). If the VM sits on the plant network the dashboard also works without internet; in a public cloud the dashboard needs internet, but counting does not.
 
 ## 3. Counting Service – Requirements
 
@@ -84,6 +88,11 @@ Priority: **P0** must for UAT, **P1** should, **P2** later.
 | CS-18 | Run YOLO26 (YOLO11 as configurable fallback) through a detector interface with selectable inference backend (Core ML, TensorRT/CUDA, OpenVINO, CPU); backend and model set by config | P0 |
 | CS-19 | Include a benchmark tool reporting FPS and p95 latency on the target device, plus an accuracy harness that replays ground-truth video and reports count accuracy and double-count rate | P0 |
 | CS-20 | Record model name, version and license reference in every health sample and report, so the deployed model is traceable | P1 |
+| CS-21 | Sync agent pushes count aggregates, health samples and alarms to the central Data API over outbound HTTPS, using a local outbox, idempotency keys and ordered backfill (section 6.1) | P0 |
+| CS-22 | Register with the Data API using a one-time token and store a revocable device token; no data is sent without it | P0 |
+| CS-23 | Pull versioned config (counting line, ROI, thresholds, targets) from the API and apply it without restart; keep the last good config if the API is unreachable | P0 |
+| CS-24 | Send a heartbeat every 10–30 s with health metrics, software version and model version | P0 |
+| CS-25 | Stream the annotated live preview to the relay only while a user is watching, at reduced rate and resolution, with a snapshot fallback every 2–5 s | P1 |
 
 ### 3.2 Non-Functional
 
@@ -92,7 +101,7 @@ Priority: **P0** must for UAT, **P1** should, **P2** later.
 | Accuracy | ≥ 99% on agreed UAT video set at maximum line speed; double-count rate < 0.5% |
 | Performance | Latency < 50 ms; CPU/GPU headroom ≥ 20% at steady state |
 | Reliability | Recover stream within 30 s; no count lost on restart; local buffer retains ≥ 7 days |
-| Security | Admin page behind authentication; camera credentials encrypted at rest; services bound to LAN only |
+| Security | Admin page behind authentication; camera credentials encrypted at rest; no inbound ports (outbound HTTPS only); revocable device token per edge device |
 | Privacy | No face or worker identification; video not retained by default |
 | Observability | Structured logs with rotation; health endpoint |
 
@@ -178,7 +187,7 @@ Left menu: **Dashboard**, **Production Lines**, **Alarms**, **Reports**, **Setti
 | Compatibility | Latest Chrome, Edge, Safari; Android and iOS browsers (PWA-capable) |
 | Accessibility | Readable contrast, touch targets ≥ 44 px, works in bright plant conditions |
 | Security | Login with hashed passwords, session timeout, RBAC enforced on the server, HTTPS |
-| Availability | Dashboard remains usable on the local network without internet |
+| Availability | Dashboard availability follows the VM/cloud SLA (target 99.5% monthly); counting and local buffering continue during any outage |
 
 ## 5. Business Rules
 
@@ -208,9 +217,9 @@ Each window gets Normal, Warning, or Critical based on the threshold matrix. Ini
 | Detection confidence (avg) | < 90% | < 80% |
 | Downtime per hour | > 5 min | > 10 min |
 
-## 6. Minimal Data API (Dashboard ↔ Counting Service)
+## 6. Minimal Data API (Edge Devices and Dashboard ↔ Central Data API)
 
-The API is served from the edge device (or later a cloud). All endpoints require authentication and HTTPS.
+The Data API runs on a VM or cloud from day one and serves every line: edge devices call it over outbound HTTPS, dashboards call it from browsers. All endpoints require authentication and HTTPS.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -226,6 +235,12 @@ The API is served from the edge device (or later a cloud). All endpoints require
 | GET/PUT | /api/v1/config/lines/{id} | Counting line, ROI, targets, thresholds |
 | GET | /api/v1/reports/export?format=pdf\|xlsx&from=&to=&line= | Report file |
 | POST | /api/v1/counts/{id}/correction | Manual correction (admin) |
+| POST | /api/v1/devices/register | Edge exchanges a one-time token for a device token |
+| POST | /api/v1/counts | Edge pushes count aggregates (idempotent) |
+| POST | /api/v1/devices/heartbeat | Edge pushes health telemetry, versions, pending-queue size |
+| POST | /api/v1/alarms/events | Edge reports raised alarms (idempotent) |
+| GET | /api/v1/devices/{id}/config?since\_version= | Edge pulls newer versioned config |
+| GET/POST | /api/v1/devices | Admin lists and registers edge devices, revokes tokens |
 
 Example summary response:
 
@@ -243,11 +258,49 @@ Example summary response:
 }
 ```
 
+### 6.1 Edge-to-API Synchronization
+
+Each Counting Service is the only writer of its own data. It stores everything locally first, then pushes to the central Data API.
+
+| Data | Granularity | Delivery |
+| --- | --- | --- |
+| Count aggregates | Per window (default 1 min) | Guaranteed, ordered, deduplicated |
+| Individual count events | Kept locally 90 days | Synced on request for audit |
+| Health telemetry | Every 10–30 s | Latest wins; gaps acceptable |
+| Alarms | On open, acknowledge, resolve | Guaranteed, idempotent |
+| Config | On change, versioned | Edge pulls the newer version |
+
+Outbox flow:
+
+1. The Counting Service writes each aggregate window and its outbox row in one local transaction (`sync_state = pending`).
+2. The sync agent sends pending rows to `POST /api/v1/counts` over HTTPS with the device token.
+3. The `idempotency_key` (`device_id + line_id + window_start`) lets the API ignore duplicates, so retries are safe.
+4. On success the row is marked `sent`; on failure it retries with exponential backoff and records the reason.
+5. After an outage the agent backfills the oldest window first, so there are no gaps.
+6. Telemetry goes to `POST /api/v1/devices/heartbeat`. It is not backfilled; only alarms are.
+7. The edge makes outbound connections only; no inbound ports are opened on the plant network.
+
+**Live video:** the edge streams the annotated preview only while a user has the live view open (WebRTC to a relay such as MediaMTX or go2rtc, at reduced frame rate and resolution), with a snapshot every 2–5 s as fallback. Continuous cloud streaming of a 4MP, 30 fps feed is not planned because of bandwidth.
+
+### 6.2 Adding a New Line
+
+1. Admin creates the device in Settings > Devices; the API issues a one-time registration token.
+2. Install the Counting Service on the new edge device and enter the API URL and token; it exchanges them for a revocable device token.
+3. Configure the line and camera in the dashboard (RTSP URL, counting line, ROI, target, shifts); the device pulls the config by version.
+4. The first heartbeat shows the device Online; the line appears in the menu, the "All lines" view and reports.
+5. Run test mode and a short accuracy check against manual counts before trusting the numbers.
+
+Rules: everything is keyed by `line_id` and `device_id`; every device runs the same software and config schema; targets and thresholds are per line; the dashboard has an "All lines" view with combined totals and a rate comparison.
+
+### 6.3 Hosting
+
+The Data API, PostgreSQL and Dashboard run on a VM or cloud from day one, deployed with Docker Compose behind Caddy or a load balancer with managed TLS, with daily database backups and monitoring. Open decision: public cloud (the plant and all users need internet to reach the dashboard) versus a private or on-premises VM on the plant network (the dashboard works without internet). Counting is unaffected either way.
+
 ## 7. Data Model
 
 | Entity | Key fields |
 | --- | --- |
-| Line | id, name, daily\_target, shift\_config, timezone |
+| Line | id, site\_id, device\_id, name, daily\_target, shift\_config, timezone |
 | Camera | id, line\_id, rtsp\_url (encrypted), resolution, fps |
 | CountingConfig | line\_id, line\_geometry, direction, roi\_mask, confidence\_threshold, interval\_sec |
 | CountEvent | id, line\_id, track\_id, ts\_utc, confidence |
@@ -257,6 +310,9 @@ Example summary response:
 | Alarm | id, line\_id, type, severity, value, opened\_at, ack\_by, ack\_at, resolved\_at, note |
 | User | id, name, email, role, status |
 | AuditLog | id, user\_id, action, entity, before, after, ts\_utc |
+| Site | id, name, timezone |
+| EdgeDevice | id, site\_id, name, token\_hash, software\_version, model\_version, last\_seen, status |
+| SyncOutbox (edge-local) | id, record\_type, record\_id, idempotency\_key, sync\_state, attempts, last\_error |
 
 Retention: events 90 days, aggregates 12 months, health samples 30 days (configurable).
 
@@ -271,15 +327,15 @@ The stack is hardware-agnostic: the edge device is not yet chosen, so only the i
 | Inference runtime | ONNX Runtime with a per-device backend (see 8.2); CPU fallback during development |
 | Tracking and line counting | ByteTrack with the `supervision` line-zone counter |
 | Video ingest | FFmpeg / PyAV with OpenCV; hardware decode optional |
-| Local storage | SQLite (WAL mode) |
+| Local storage | SQLite (WAL mode) on the edge as buffer and outbox |
 | Data API | FastAPI, SQLAlchemy, Alembic; Server-Sent Events for live updates |
 | Auth | JWT sessions, argon2 password hashing, server-side RBAC |
 | Reports | openpyxl (Excel), WeasyPrint (PDF) |
-| Live video | MJPEG sub-stream with overlay in phase 1; WebRTC (MediaMTX or go2rtc) if latency requires |
+| Live video | On-demand WebRTC via a MediaMTX or go2rtc relay at reduced rate, with snapshot fallback every 2–5 s |
 | Dashboard | React, TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Apache ECharts, i18next, PWA |
-| Reverse proxy / TLS | Caddy with internal CA for LAN HTTPS |
+| Reverse proxy / TLS | Caddy or cloud load balancer with managed TLS certificates |
 | Packaging | Docker Compose on Linux/Windows devices; native `launchd` service on macOS (Docker on macOS cannot reach the Neural Engine) |
-| Later (cloud) | PostgreSQL, optionally TimescaleDB; SQLAlchemy models stay portable |
+| Central database and hosting | PostgreSQL (TimescaleDB optional); Data API, database and dashboard on a VM or cloud from day one |
 | Quality | pytest, Playwright, GitHub Actions CI, structured JSON logs, `/healthz` endpoint |
 
 ### 8.1 Detection Model: YOLO26 with YOLO11 Fallback
@@ -324,7 +380,7 @@ YOLO26 and YOLO11 are both released by Ultralytics under AGPL-3.0, with a separa
 
 | Weeks | Counting Service | Dashboard |
 | --- | --- | --- |
-| 2–3 | RTSP ingest, config, storage schema, health metrics | UI shell, auth, mock data, navigation |
+| 2–3 | RTSP ingest, config, storage schema, health metrics | VM/cloud environment, UI shell, auth, mock data, navigation |
 | 4 | On-site stream test, calibration page, sample recording | Data API v1 |
 | 5–6 | Detector + tracker + counting line, latency tuning, watchdog | Overview, Live Monitoring, Reports with real data |
 | 7–8 | Alarms, corrections, UAT fixes | Alarms, Settings, export, training and docs |
@@ -333,7 +389,7 @@ YOLO26 and YOLO11 are both released by Ultralytics under AGPL-3.0, with a separa
 
 1. Count accuracy ≥ 99% on the agreed ground-truth set across shifts and lighting at max line speed.
 2. 24-hour run at 30 fps with p95 latency < 50 ms, no crash.
-3. Network and internet cut for 1 hour: counting continues, dashboard on LAN still works, no data lost.
+3. Network and internet cut for 1 hour: counting continues, the local buffer keeps every count, and after reconnection the dashboard shows all missed windows in order with no loss or duplicates.
 4. Power-cycle: service auto-recovers in < 2 min with counts preserved.
 5. All P0 dashboard screens work on desktop and a phone over plant Wi-Fi.
 6. Alarms fire within 60 s for camera offline and rate below threshold.
@@ -357,6 +413,9 @@ YOLO26 and YOLO11 are both released by Ultralytics under AGPL-3.0, with a separa
 | Text placeholder | Proposal closing still says \[NAMA KLIEN\]. |
 | YOLO license (AGPL-3.0) | Closed-source delivery needs the Ultralytics Enterprise License; obtain it before shipping and confirm licensee and per-device terms (see 8.3). Fallback: swap to a permissively licensed detector via the detector interface. |
 | Device undecided | Hardware-agnostic inference plus a benchmark gate (≥ 30 fps, p95 < 50 ms) before purchase (see 8.2). |
+| Plant-to-cloud connectivity | Dashboard freshness and sync depend on the link. Edge buffer holds ≥ 7 days with ordered backfill; if internet is unreliable, host on an on-premises VM on the plant network. |
+| Live video bandwidth | Stream only on demand at reduced rate and resolution; snapshot fallback (section 6.1). |
+| Cloud security and data residency | Outbound-only edge, TLS, revocable device tokens, role-based access, backups; confirm client policy on data location and who operates the VM after go-live. |
 
 ## 11. Glossary
 
