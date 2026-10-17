@@ -13,7 +13,11 @@ class Line(Base):
     id: Mapped[str] = mapped_column(String(50), primary_key=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     daily_target: Mapped[int] = mapped_column(Integer, default=62000)
+    video_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    line_coords: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    line_direction: Mapped[str] = mapped_column(String(20), default="down")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self) -> str:
         return f"<Line(id='{self.id}', name='{self.name}', daily_target={self.daily_target}, is_active={self.is_active})>"
