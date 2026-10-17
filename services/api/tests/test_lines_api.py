@@ -233,3 +233,93 @@ def test_update_line_invalid_coords_and_direction(lines_client):
     assert resp2.status_code == 422
 
 
+def test_update_line_clear_coords(lines_client):
+    client = lines_client
+    # Set coordinates and video_url first
+    setup_resp = client.put(
+        "/api/v1/lines/line-1",
+        json={"line_coords": "10,20,30,40", "video_url": "rtsp://camera/stream"},
+    )
+    assert setup_resp.status_code == 200
+    assert setup_resp.json()["line_coords"] == "10,20,30,40"
+    assert setup_resp.json()["video_url"] == "rtsp://camera/stream"
+
+    # Updating with line_coords=None clears line_coords but keeps video_url intact
+    clear_resp = client.put("/api/v1/lines/line-1", json={"line_coords": None})
+    assert clear_resp.status_code == 200
+    assert clear_resp.json()["line_coords"] is None
+    assert clear_resp.json()["video_url"] == "rtsp://camera/stream"
+
+    # Verify persisted in database via GET
+    get_resp = client.get("/api/v1/lines/line-1")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["line_coords"] is None
+    assert get_resp.json()["video_url"] == "rtsp://camera/stream"
+
+    # Updating with video_url=None clears video_url as well
+    clear_video_resp = client.put("/api/v1/lines/line-1", json={"video_url": None})
+    assert clear_video_resp.status_code == 200
+    assert clear_video_resp.json()["video_url"] is None
+
+
+def test_create_line_id_slug_validation(lines_client):
+    client = lines_client
+    base_payload = {"name": "Test Conveyor", "daily_target": 50000}
+
+    # Invalid characters in id
+    for invalid_id in ["line!1", "line 1", "line.1", "line#1", "line$1", "line@"]:
+        resp = client.post("/api/v1/lines", json={**base_payload, "id": invalid_id})
+        assert resp.status_code == 422, f"Expected 422 for invalid id '{invalid_id}', got {resp.status_code}"
+
+    # Too short id (must be at least 2 characters)
+    for short_id in ["", "a", " a "]:
+        resp = client.post("/api/v1/lines", json={**base_payload, "id": short_id})
+        assert resp.status_code == 422, f"Expected 422 for short id '{short_id}', got {resp.status_code}"
+
+    # Too long id (max 50 chars)
+    long_id = "a" * 51
+    resp = client.post("/api/v1/lines", json={**base_payload, "id": long_id})
+    assert resp.status_code == 422, f"Expected 422 for long id, got {resp.status_code}"
+
+    # Valid slugs (2 to 50 chars, alphanumeric + '-' + '_')
+    for valid_id in ["ab", "Line-99", "line_100", "a" * 50]:
+        resp = client.post("/api/v1/lines", json={**base_payload, "id": valid_id})
+        assert resp.status_code == 201, f"Expected 201 for valid id '{valid_id}', got {resp.status_code}"
+
+
+def test_coords_finite_check_and_normalization(lines_client):
+    client = lines_client
+    # Non-finite values rejected
+    for non_finite in ["nan,0,10,20", "inf,0,10,20", "-inf,0,10,20"]:
+        resp = client.post("/api/v1/lines", json={"id": "line-finite-test", "name": "Finite Test", "line_coords": non_finite})
+        assert resp.status_code == 422
+
+    # Normalization of whitespace
+    resp = client.post(
+        "/api/v1/lines",
+        json={"id": "line-norm", "name": "Norm Test", "line_coords": "  10 , 20.5 ,  30 , 40.5 "},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["line_coords"] == "10,20.5,30,40.5"
+
+
+def test_update_line_field_length_limits(lines_client):
+    client = lines_client
+    # Name empty string
+    resp = client.put("/api/v1/lines/line-1", json={"name": ""})
+    assert resp.status_code == 422
+
+    # Name too long (>100 chars)
+    resp = client.put("/api/v1/lines/line-1", json={"name": "x" * 101})
+    assert resp.status_code == 422
+
+    # Video url too long (>500 chars)
+    resp = client.put("/api/v1/lines/line-1", json={"video_url": "http://" + "x" * 501})
+    assert resp.status_code == 422
+
+    # Line coords too long (>100 chars)
+    resp = client.put("/api/v1/lines/line-1", json={"line_coords": "1," * 51})
+    assert resp.status_code == 422
+
+
+

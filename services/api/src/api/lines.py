@@ -1,9 +1,11 @@
+import math
 import re
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from services.api.src.db.models import Line, HealthSample, CountEvent
 from services.api.src.db.session import get_db
@@ -21,10 +23,12 @@ def validate_coords_format(coords: Optional[str]) -> Optional[str]:
         raise ValueError("line_coords must contain 4 comma-separated numbers (x1,y1,x2,y2)")
     for p in parts:
         try:
-            float(p)
+            val = float(p)
         except ValueError:
             raise ValueError("All coordinates in line_coords must be valid numbers")
-    return coords.strip()
+        if not math.isfinite(val):
+            raise ValueError("All coordinates in line_coords must be finite numbers")
+    return ",".join(parts)
 
 
 class LineCreatePayload(BaseModel):
@@ -40,8 +44,8 @@ class LineCreatePayload(BaseModel):
     @classmethod
     def validate_id_slug(cls, v: str) -> str:
         v = v.strip()
-        if not re.match(r"^[a-zA-Z0-9_-]+$", v):
-            raise ValueError("id must contain only letters, numbers, hyphens, and underscores")
+        if not re.match(r"^[a-zA-Z0-9_-]{2,50}$", v):
+            raise ValueError("id must contain only letters, numbers, hyphens, and underscores, between 2 and 50 characters")
         return v
 
     @field_validator("line_coords")
@@ -59,10 +63,10 @@ class LineCreatePayload(BaseModel):
 
 
 class LineUpdatePayload(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
     daily_target: Optional[int] = Field(None, gt=0)
-    video_url: Optional[str] = None
-    line_coords: Optional[str] = None
+    video_url: Optional[str] = Field(None, max_length=500)
+    line_coords: Optional[str] = Field(None, max_length=100)
     line_direction: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -123,9 +127,16 @@ def create_line(payload: LineCreatePayload, db: Session = Depends(get_db)):
         line_direction=payload.line_direction,
         is_active=payload.is_active,
     )
-    db.add(new_line)
-    db.commit()
-    db.refresh(new_line)
+    try:
+        db.add(new_line)
+        db.commit()
+        db.refresh(new_line)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Line with ID '{payload.id}' already exists",
+        )
     return LineDetailDTO(
         id=new_line.id,
         name=new_line.name,
@@ -208,17 +219,18 @@ def update_line(line_id: str, payload: LineUpdatePayload, db: Session = Depends(
     line = db.get(Line, line_id)
     if not line:
         raise HTTPException(status_code=404, detail="Line not found")
-    if payload.name is not None:
+    fields_set = payload.model_fields_set
+    if "name" in fields_set and payload.name is not None:
         line.name = payload.name
-    if payload.daily_target is not None:
+    if "daily_target" in fields_set and payload.daily_target is not None:
         line.daily_target = payload.daily_target
-    if payload.video_url is not None:
+    if "video_url" in fields_set:
         line.video_url = payload.video_url
-    if payload.line_coords is not None:
+    if "line_coords" in fields_set:
         line.line_coords = payload.line_coords
-    if payload.line_direction is not None:
+    if "line_direction" in fields_set and payload.line_direction is not None:
         line.line_direction = payload.line_direction
-    if payload.is_active is not None:
+    if "is_active" in fields_set and payload.is_active is not None:
         line.is_active = payload.is_active
     db.commit()
     db.refresh(line)
