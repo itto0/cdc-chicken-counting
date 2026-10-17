@@ -32,7 +32,7 @@ const THRESHOLD_DATA: ThresholdRow[] = [
 
 export function ThresholdMatrixCard() {
   return (
-    <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white">
+    <Card className="rounded-2xl border-slate-200/80 shadow-sm bg-white">
       <CardHeader className="p-4 pb-2">
         <CardTitle className="text-sm font-semibold text-slate-800">
           Matriks Ambang Batas (Threshold Matrix)
@@ -55,9 +55,9 @@ export function ThresholdMatrixCard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {THRESHOLD_DATA.map((row, idx) => (
+              {THRESHOLD_DATA.map((row) => (
                 <TableRow
-                  key={idx}
+                  key={row.metric}
                   className="border-b border-slate-100/80 last:border-b-0 hover:bg-slate-50/50 transition-colors"
                 >
                   <TableCell className="font-medium text-slate-800 py-3">

@@ -13,6 +13,7 @@ export function LiveAlarmsCard({ lineId }: LiveAlarmsCardProps) {
 
   useEffect(() => {
     let isMounted = true;
+    setAlarms([]);
 
     const fetchAlarms = () => {
       if (!lineId) return;
@@ -44,15 +45,23 @@ export function LiveAlarmsCard({ lineId }: LiveAlarmsCardProps) {
     try {
       const dt = new Date(isoStr);
       if (isNaN(dt.getTime())) return isoStr;
-      const pad = (n: number) => String(n).padStart(2, "0");
-      return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+      return new Intl.DateTimeFormat("id-ID", {
+        timeZone: "Asia/Jakarta",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      }).format(dt);
     } catch {
       return isoStr;
     }
   };
 
   return (
-    <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white">
+    <Card className="rounded-2xl border-slate-200/80 shadow-sm bg-white">
       <CardHeader className="p-4 pb-2">
         <CardTitle className="text-sm font-semibold text-slate-800">
           Alarm &amp; Notifikasi

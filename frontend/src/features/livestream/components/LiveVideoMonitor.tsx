@@ -33,7 +33,7 @@ export function LiveVideoMonitor({
   const showOverlay = !isConnected || !previewUrl || imgError || !isPlaying;
 
   return (
-    <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white overflow-hidden" data-line-id={lineId}>
+    <Card className="rounded-2xl border-slate-200/80 shadow-sm bg-white overflow-hidden" data-line-id={lineId}>
       <CardHeader className="p-4 pb-2">
         <CardTitle className="text-sm font-semibold text-slate-800">
           Pratinjau Kamera Langsung
@@ -42,7 +42,7 @@ export function LiveVideoMonitor({
       <CardContent className="p-4 pt-1">
         <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full rounded-xl bg-slate-950 overflow-hidden flex flex-col justify-between">
           {/* MJPEG Stream Image */}
-          {isPlaying && previewUrl && !imgError && (
+          {isPlaying && isConnected && previewUrl && !imgError && (
             <img
               src={previewUrl}
               alt="Live video stream"
@@ -53,7 +53,7 @@ export function LiveVideoMonitor({
 
           {/* Overlay fallback for paused or disconnected states */}
           {showOverlay && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/85 text-slate-300 p-6 text-center z-10 backdrop-blur-xs">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/85 text-slate-300 p-6 text-center z-10 backdrop-blur-sm">
               {!isPlaying ? (
                 <div className="flex flex-col items-center gap-2">
                   <Pause className="w-8 h-8 text-slate-400" />
@@ -91,14 +91,14 @@ export function LiveVideoMonitor({
 
           {/* Top LIVE Tag */}
           <div className="relative z-20 p-3 flex items-center justify-between pointer-events-none">
-            <div className="flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-xs px-2.5 py-1 rounded-full text-[11px] font-semibold text-white">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+            <div className="flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-sm px-2.5 py-1 rounded-full text-[11px] font-semibold text-white">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" aria-hidden="true" />
               <span>LIVE</span>
             </div>
           </div>
 
           {/* Overlay Bar Bottom: Terhitung Count */}
-          <div className="relative z-20 w-full bg-[#1e293b]/90 backdrop-blur-xs text-white py-2.5 px-4 flex items-center justify-center border-t border-slate-800/60 shadow-md">
+          <div className="relative z-20 w-full bg-[#1e293b]/90 backdrop-blur-sm text-white py-2.5 px-4 flex items-center justify-center border-t border-slate-800/60 shadow-md">
             <span className="text-lg sm:text-2xl font-bold tracking-tight text-white">
               Terhitung: {(totalToday ?? 0).toLocaleString("id-ID")}
             </span>

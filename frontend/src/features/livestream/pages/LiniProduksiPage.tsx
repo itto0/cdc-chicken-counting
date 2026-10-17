@@ -12,7 +12,7 @@ import { ThresholdMatrixCard } from "../components/ThresholdMatrixCard";
 
 export default function LiniProduksiPage() {
   const { currentLineId, lines, isConnected } = useAppContext();
-  const { status, totalToday, fps, latencyMs, reconnect } =
+  const { status, streamState, totalToday, fps, latencyMs, reconnect } =
     useLiveStream(currentLineId);
   const [retryNonce, setRetryNonce] = useState(0);
 
@@ -64,7 +64,7 @@ export default function LiniProduksiPage() {
           <SystemStatusCard
             fps={fps ?? 30}
             latencyMs={latencyMs ?? 42}
-            streamState={isStreaming ? "online" : "offline"}
+            streamState={isStreaming ? (streamState?.toLowerCase() || "online") : "offline"}
           />
           <LiveAlarmsCard lineId={currentLineId} />
         </div>

@@ -39,7 +39,7 @@ export function SystemStatusCard({
   const statusStyle = getStatusColor();
 
   return (
-    <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white">
+    <Card className="rounded-2xl border-slate-200/80 shadow-sm bg-white">
       <CardHeader className="p-4 pb-2">
         <CardTitle className="text-sm font-semibold text-slate-800">
           Status Sistem
