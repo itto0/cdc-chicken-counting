@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Play, Pause, RotateCw, Eye } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface DashboardLivePreviewProps {
   lineId: string;
@@ -8,6 +9,7 @@ interface DashboardLivePreviewProps {
   previewUrl: string;
   isConnected: boolean;
   onRetry?: () => void;
+  className?: string;
 }
 
 export function DashboardLivePreview({
@@ -16,15 +18,20 @@ export function DashboardLivePreview({
   previewUrl,
   isConnected,
   onRetry,
+  className,
 }: DashboardLivePreviewProps) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [previewUrl]);
 
   const displayName = lineName || lineId || "Lini A";
 
   return (
     <Card
-      className="rounded-2xl border-slate-200/80 shadow-sm bg-white overflow-hidden mt-4"
+      className={cn("rounded-2xl border-slate-200/80 shadow-sm bg-white overflow-hidden", className)}
       data-line-id={lineId}
     >
       {/* Card Header Title */}
@@ -47,7 +54,7 @@ export function DashboardLivePreview({
         ) : null}
 
         {/* Offline / Paused / Error Overlay */}
-        {(!isConnected || imgError || !isPlaying) && (
+        {(!isConnected || !previewUrl || imgError || !isPlaying) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 text-white p-4 text-center">
             <Eye className="w-8 h-8 text-slate-400 mb-2 animate-pulse" />
             <p className="text-sm font-medium">
