@@ -26,6 +26,20 @@ import { useAppContext } from "@/context/AppContext";
 import { AddLineModal } from "../components/AddLineModal";
 import type { CreateLinePayload, Line } from "@/types";
 
+const DIRECTION_LABELS: Record<string, string> = {
+  down: "Ke Bawah (Down)",
+  up: "Ke Atas (Up)",
+  right: "Ke Kanan (Right)",
+  left: "Ke Kiri (Left)",
+  in: "Masuk (In)",
+  out: "Keluar (Out)",
+};
+
+const formatDirection = (dir?: string) => {
+  if (!dir) return "Ke Bawah (Down)";
+  return DIRECTION_LABELS[dir] || dir;
+};
+
 export default function PengaturanPage() {
   const {
     currentLineId,
@@ -66,12 +80,24 @@ export default function PengaturanPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentLine?.id) return;
-    setIsSaving(true);
     setSaveError(null);
+
+    const trimmedName = lineName.trim();
+    if (!trimmedName) {
+      setSaveError("Nama lini wajib diisi");
+      return;
+    }
+    const target = Number(dailyTarget);
+    if (isNaN(target) || target <= 0) {
+      setSaveError("Target harian harus lebih besar dari 0");
+      return;
+    }
+
+    setIsSaving(true);
     try {
       await updateLine(currentLine.id, {
-        name: lineName.trim(),
-        daily_target: Number(dailyTarget),
+        name: trimmedName,
+        daily_target: target,
       });
       setIsSaved(true);
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -220,8 +246,8 @@ export default function PengaturanPage() {
             </div>
             <div className="flex justify-between py-1.5 border-b border-slate-100">
               <span className="text-slate-500">Arah Hitung:</span>
-              <span className="font-medium text-slate-800 capitalize">
-                {currentLine?.line_direction || "down"}
+              <span className="font-medium text-slate-800">
+                {formatDirection(currentLine?.line_direction)}
               </span>
             </div>
             <div className="flex justify-between py-1.5 border-b border-slate-100">
@@ -264,6 +290,7 @@ export default function PengaturanPage() {
               <button
                 type="button"
                 onClick={() => setActionError(null)}
+                aria-label="Tutup pemberitahuan"
                 className="text-rose-500 hover:text-rose-700 font-bold ml-2 cursor-pointer"
               >
                 ✕
@@ -324,8 +351,8 @@ export default function PengaturanPage() {
                             <span className="font-mono text-slate-700 block">
                               {line.line_coords || "0,240,640,240"}
                             </span>
-                            <span className="text-[11px] text-slate-400 capitalize">
-                              Arah: {line.line_direction || "down"}
+                            <span className="text-[11px] text-slate-500">
+                              Arah: {formatDirection(line.line_direction)}
                             </span>
                           </div>
                         </TableCell>

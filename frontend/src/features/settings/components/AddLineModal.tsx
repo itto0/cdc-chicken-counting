@@ -37,6 +37,17 @@ export function AddLineModal({ isOpen, onClose, onSubmit }: AddLineModalProps) {
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isSubmitting) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isSubmitting, onClose]);
+
   if (!isOpen) return null;
 
   const handleIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,6 +63,11 @@ export function AddLineModal({ isOpen, onClose, onSubmit }: AddLineModalProps) {
       setErrorMsg("ID Lini wajib diisi");
       return;
     }
+    const slugRegex = /^[a-z0-9_-]{2,50}$/;
+    if (!slugRegex.test(cleanId)) {
+      setErrorMsg("ID Lini harus berupa 2-50 karakter alfanumerik (huruf kecil, angka, strip '-', atau garis bawah '_')");
+      return;
+    }
     if (!name.trim()) {
       setErrorMsg("Nama Lini wajib diisi");
       return;
@@ -61,6 +77,14 @@ export function AddLineModal({ isOpen, onClose, onSubmit }: AddLineModalProps) {
     if (isNaN(targetNum) || targetNum <= 0) {
       setErrorMsg("Target harian harus berupa angka lebih besar dari 0");
       return;
+    }
+
+    if (lineCoords.trim()) {
+      const parts = lineCoords.split(",").map((p) => p.trim());
+      if (parts.length !== 4 || parts.some((p) => p === "" || isNaN(Number(p)))) {
+        setErrorMsg("Koordinat garis harus berisi 4 angka dipisahkan koma (contoh: 0,240,640,240)");
+        return;
+      }
     }
 
     try {
@@ -78,7 +102,23 @@ export function AddLineModal({ isOpen, onClose, onSubmit }: AddLineModalProps) {
       onClose();
     } catch (err: unknown) {
       let msg = "Gagal membuat lini baru";
-      if (err && typeof err === "object") {
+      if (err instanceof Error) {
+        const raw = err.message.replace(/^API Error \d+:\s*/, "");
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed?.detail)) {
+            msg = parsed.detail.map((d: { msg?: string }) => d.msg || "Validasi gagal").join(", ");
+          } else if (typeof parsed?.detail === "string") {
+            msg = parsed.detail;
+          } else if (typeof parsed?.message === "string") {
+            msg = parsed.message;
+          } else {
+            msg = raw;
+          }
+        } catch {
+          msg = raw || err.message;
+        }
+      } else if (err && typeof err === "object") {
         const errorObj = err as Record<string, unknown>;
         const response = errorObj.response as Record<string, unknown> | undefined;
         const resData = response?.data as Record<string, unknown> | undefined;
@@ -100,6 +140,9 @@ export function AddLineModal({ isOpen, onClose, onSubmit }: AddLineModalProps) {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-line-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) onClose();
@@ -108,7 +151,7 @@ export function AddLineModal({ isOpen, onClose, onSubmit }: AddLineModalProps) {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
           <div>
-            <h3 className="font-semibold text-slate-800 text-base">Tambah Lini Produksi Baru</h3>
+            <h3 id="add-line-modal-title" className="font-semibold text-slate-800 text-base">Tambah Lini Produksi Baru</h3>
             <p className="text-xs text-slate-500">Konfigurasi lini baru, target kuota, dan sumber video kamera</p>
           </div>
           <button
