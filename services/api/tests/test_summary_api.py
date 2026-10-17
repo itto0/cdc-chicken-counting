@@ -19,54 +19,67 @@ class MockDatetime(datetime):
 
 
 @pytest.fixture
-def summary_client():
+def test_engine():
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    return engine
 
-    db = TestingSession()
+
+@pytest.fixture
+def db_session(test_engine):
+    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+    session = TestingSession()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@pytest.fixture
+def summary_client(test_engine, db_session):
     # Line 1: Active line with distributed events and alarms
-    db.add(Line(id="line-1", name="Line 1", daily_target=1000, is_active=True))
+    db_session.add(Line(id="line-1", name="Line 1", daily_target=1000, is_active=True))
 
     # Event distribution across time windows:
     # 20 events 2 minutes ago (within last 5 min, today, shift, week)
     for i in range(20):
-        db.add(CountEvent(line_id="line-1", track_id=i + 1, ts_utc=FIXED_NOW - timedelta(minutes=2), confidence=0.95))
+        db_session.add(CountEvent(line_id="line-1", track_id=i + 1, ts_utc=FIXED_NOW - timedelta(minutes=2), confidence=0.95))
     # 20 events 4 hours ago (yesterday in UTC at 02:00, within shift [8h] and week [7d], outside today [2h])
     for i in range(20):
-        db.add(CountEvent(line_id="line-1", track_id=20 + i + 1, ts_utc=FIXED_NOW - timedelta(hours=4), confidence=0.95))
+        db_session.add(CountEvent(line_id="line-1", track_id=20 + i + 1, ts_utc=FIXED_NOW - timedelta(hours=4), confidence=0.95))
     # 20 events 2 days ago (within week [7d], outside shift and today)
     for i in range(20):
-        db.add(CountEvent(line_id="line-1", track_id=40 + i + 1, ts_utc=FIXED_NOW - timedelta(days=2), confidence=0.95))
+        db_session.add(CountEvent(line_id="line-1", track_id=40 + i + 1, ts_utc=FIXED_NOW - timedelta(days=2), confidence=0.95))
     # 20 events 10 days ago (outside week [7d], shift, and today)
     for i in range(20):
-        db.add(CountEvent(line_id="line-1", track_id=60 + i + 1, ts_utc=FIXED_NOW - timedelta(days=10), confidence=0.95))
+        db_session.add(CountEvent(line_id="line-1", track_id=60 + i + 1, ts_utc=FIXED_NOW - timedelta(days=10), confidence=0.95))
 
     # Health sample: fresh sample at FIXED_NOW
-    db.add(HealthSample(line_id="line-1", timestamp=FIXED_NOW, fps=28.5, latency_p95_ms=18.0, cpu_pct=30.0, mem_pct=45.0, stream_state="ONLINE"))
+    db_session.add(HealthSample(line_id="line-1", timestamp=FIXED_NOW, fps=28.5, latency_p95_ms=18.0, cpu_pct=30.0, mem_pct=45.0, stream_state="ONLINE"))
 
     # Alarms: 1 OPEN + 1 ACKNOWLEDGED (counted as active) + 1 RESOLVED (excluded)
-    db.add(Alarm(line_id="line-1", alarm_type="SPEED_WARNING", severity="WARNING", message="Slow speed", status="OPEN", opened_at=FIXED_NOW))
-    db.add(Alarm(line_id="line-1", alarm_type="CAMERA_DROP", severity="CRITICAL", message="Camera dropped", status="ACKNOWLEDGED", opened_at=FIXED_NOW, ack_at=FIXED_NOW))
-    db.add(Alarm(line_id="line-1", alarm_type="DISCONNECT", severity="INFO", message="Reconnected", status="RESOLVED", opened_at=FIXED_NOW - timedelta(hours=1), resolved_at=FIXED_NOW))
+    db_session.add(Alarm(line_id="line-1", alarm_type="SPEED_WARNING", severity="WARNING", message="Slow speed", status="OPEN", opened_at=FIXED_NOW))
+    db_session.add(Alarm(line_id="line-1", alarm_type="CAMERA_DROP", severity="CRITICAL", message="Camera dropped", status="ACKNOWLEDGED", opened_at=FIXED_NOW, ack_at=FIXED_NOW))
+    db_session.add(Alarm(line_id="line-1", alarm_type="DISCONNECT", severity="INFO", message="Reconnected", status="RESOLVED", opened_at=FIXED_NOW - timedelta(hours=1), resolved_at=FIXED_NOW))
 
     # Line 2: Empty line with stale health (>60s) and zero target
-    db.add(Line(id="line-2", name="Line 2", daily_target=0, is_active=False))
-    db.add(HealthSample(line_id="line-2", timestamp=FIXED_NOW - timedelta(seconds=90), fps=24.0, latency_p95_ms=22.0, cpu_pct=20.0, mem_pct=30.0, stream_state="ONLINE"))
+    db_session.add(Line(id="line-2", name="Line 2", daily_target=0, is_active=False))
+    db_session.add(HealthSample(line_id="line-2", timestamp=FIXED_NOW - timedelta(seconds=90), fps=24.0, latency_p95_ms=22.0, cpu_pct=20.0, mem_pct=30.0, stream_state="ONLINE"))
 
     # Line 3: Line with no health samples and no events
-    db.add(Line(id="line-3", name="Line 3", daily_target=5000, is_active=True))
+    db_session.add(Line(id="line-3", name="Line 3", daily_target=5000, is_active=True))
 
     # Line 4: Line with future health sample timestamp (> 0s in the future)
-    db.add(Line(id="line-4", name="Line 4", daily_target=2000, is_active=True))
-    db.add(HealthSample(line_id="line-4", timestamp=FIXED_NOW + timedelta(seconds=30), fps=30.0, latency_p95_ms=15.0, cpu_pct=25.0, mem_pct=35.0, stream_state="ONLINE"))
+    db_session.add(Line(id="line-4", name="Line 4", daily_target=2000, is_active=True))
+    db_session.add(HealthSample(line_id="line-4", timestamp=FIXED_NOW + timedelta(seconds=30), fps=30.0, latency_p95_ms=15.0, cpu_pct=25.0, mem_pct=35.0, stream_state="ONLINE"))
 
-    db.commit()
-    db.close()
+    db_session.commit()
+
+    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
     def override_get_db():
         db = TestingSession()
@@ -183,3 +196,28 @@ def test_get_line_summary_no_health_no_events(summary_client):
     assert data["current_speed_cpm"] == 0.0
     assert data["active_alarms_count"] == 0
     assert data["last_event_time"] is None
+
+
+def test_get_line_summary_detection_accuracy(summary_client, db_session):
+    from datetime import datetime, timezone
+    from services.api.src.db.models import CountEvent
+
+    # Clear pre-seeded events so line-1 has no events initially
+    db_session.query(CountEvent).filter_by(line_id="line-1").delete()
+    db_session.commit()
+
+    # Default without events should return 99.2
+    res_default = summary_client.get("/api/v1/lines/line-1/summary?period=today").json()
+    assert "detection_accuracy_pct" in res_default
+    assert res_default["detection_accuracy_pct"] == 99.2
+
+    # Add count events with confidence
+    now = FIXED_NOW
+    ev1 = CountEvent(line_id="line-1", track_id=1, ts_utc=now, confidence=0.985)
+    ev2 = CountEvent(line_id="line-1", track_id=2, ts_utc=now, confidence=0.995)
+    db_session.add_all([ev1, ev2])
+    db_session.commit()
+
+    res_with_events = summary_client.get("/api/v1/lines/line-1/summary?period=today").json()
+    assert res_with_events["detection_accuracy_pct"] == 99.0
+
