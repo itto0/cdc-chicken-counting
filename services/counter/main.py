@@ -847,8 +847,10 @@ def fetch_remote_line_config(
         # Deduce base URL from api_sync_url (e.g., http://host:port/api/v1/sync/batch -> http://host:port/api/v1/lines/{line_id})
         if "/api/v1/" in api_sync_url:
             base_api = api_sync_url.split("/api/v1/")[0] + "/api/v1"
-        else:
+        elif api_sync_url.rstrip("/").endswith("/api/v1"):
             base_api = api_sync_url.rstrip("/")
+        else:
+            base_api = f"{api_sync_url.rstrip('/')}/api/v1"
 
         target_url = f"{base_api}/lines/{line_id}"
         resp = httpx.get(target_url, timeout=timeout)
@@ -888,7 +890,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             if not args.line and remote_config.get("line_coords"):
                 args.line = remote_config["line_coords"]
                 logger.info("[RemoteConfig] Applied line coordinates: %s", args.line)
-            if (not os.getenv("LINE_DIRECTION") or args.direction == "down") and remote_config.get("line_direction"):
+            if not os.getenv("LINE_DIRECTION") and args.direction == "down" and remote_config.get("line_direction"):
                 args.direction = remote_config["line_direction"]
                 logger.info("[RemoteConfig] Applied line direction: %s", args.direction)
 

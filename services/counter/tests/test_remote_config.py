@@ -65,7 +65,7 @@ def test_fetch_remote_config_url_without_api_v1():
         )
         assert config == {"id": "line-x"}
         mock_get.assert_called_once_with(
-            "http://central-api:8070/lines/line-x",
+            "http://central-api:8070/api/v1/lines/line-x",
             timeout=3.0,
         )
 
@@ -145,4 +145,32 @@ def test_main_startup_remote_config_disabled_when_no_sync(monkeypatch):
         main([])
 
         mock_fetch.assert_not_called()
+
+
+def test_main_startup_remote_config_cli_direction_precedence(monkeypatch):
+    """CLI --direction up without LINE_DIRECTION env var is NOT overwritten by remote config."""
+    from services.counter.main import main
+
+    monkeypatch.setenv("LINE_ID", "line-remote")
+    monkeypatch.setenv("API_SYNC_URL", "http://central:8000/api/v1/sync/batch")
+    monkeypatch.delenv("LINE_DIRECTION", raising=False)
+
+    mock_remote_config = {
+        "id": "line-remote",
+        "video_url": "rtsp://remote/stream",
+        "line_coords": "100,200,300,400",
+        "line_direction": "down",
+    }
+
+    with patch("services.counter.main.fetch_remote_line_config", return_value=mock_remote_config), \
+         patch("services.counter.main.CounterService") as mock_service_cls:
+        mock_instance = MagicMock()
+        mock_service_cls.return_value = mock_instance
+
+        main(["--direction", "up"])
+
+        mock_service_cls.assert_called_once()
+        kwargs = mock_service_cls.call_args.kwargs
+        assert kwargs["line_direction"] == "up"
+
 
