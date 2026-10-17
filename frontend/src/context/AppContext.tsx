@@ -7,20 +7,25 @@ import React, {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import type { LineItem, UserRole } from "@/types";
-import { http } from "@/lib/http";
+import type { CreateLinePayload, Line, UpdateLinePayload, UserRole } from "@/types";
+import { apiClient } from "@/services/apiClient";
 
 export interface AppContextType {
   currentLineId: string;
   setLineId: (lineId: string) => void;
+  setCurrentLineId: (lineId: string) => void;
   currentRole: UserRole;
   setRole: (role: UserRole) => void;
-  lines: LineItem[];
+  lines: Line[];
   isConnected: boolean;
   refreshLines: () => Promise<void>;
+  fetchLines: () => Promise<void>;
+  createLine: (payload: CreateLinePayload) => Promise<Line>;
+  updateLine: (lineId: string, payload: UpdateLinePayload) => Promise<Line>;
+  deleteLine: (lineId: string) => Promise<Line>;
 }
 
-export const FALLBACK_MOCK_LINE: LineItem = {
+export const FALLBACK_MOCK_LINE: Line = {
   id: "line-1",
   name: "Conveyor Line 1",
   is_active: true,
@@ -43,19 +48,20 @@ export const AppProvider: React.FC<AppProviderProps> = ({
   initialLineId = "line-1",
   initialRole = "ADMIN",
 }) => {
-  const [currentLineId, setLineId] = useState<string>(initialLineId);
+  const [currentLineId, setCurrentLineId] = useState<string>(initialLineId);
+  const setLineId = setCurrentLineId;
   const [currentRole, setRole] = useState<UserRole>(initialRole);
-  const [lines, setLines] = useState<LineItem[]>([FALLBACK_MOCK_LINE]);
+  const [lines, setLines] = useState<Line[]>([FALLBACK_MOCK_LINE]);
   const [isConnected, setIsConnected] = useState<boolean>(false);
 
-  const refreshLines = useCallback(async () => {
+  const fetchLines = useCallback(async () => {
     try {
-      const data = await http<LineItem[]>("/api/v1/lines");
+      const data = await apiClient.getLines();
       if (Array.isArray(data) && data.length > 0) {
         setLines(data);
         setIsConnected(true);
         // If currentLineId is not among fetched lines, select the first line
-        setLineId((prev) => {
+        setCurrentLineId((prev) => {
           const exists = data.some((item) => item.id === prev);
           return exists ? prev : data[0].id;
         });
@@ -70,12 +76,47 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     }
   }, []);
 
+  const refreshLines = fetchLines;
+
   useEffect(() => {
-    refreshLines();
-  }, [refreshLines]);
+    fetchLines();
+  }, [fetchLines]);
+
+  const createLine = useCallback(async (payload: CreateLinePayload) => {
+    const newLine = await apiClient.createLine(payload);
+    await fetchLines();
+    setCurrentLineId(newLine.id);
+    return newLine;
+  }, [fetchLines]);
+
+  const updateLine = useCallback(async (lineId: string, payload: UpdateLinePayload) => {
+    const updated = await apiClient.updateLine(lineId, payload);
+    await fetchLines();
+    return updated;
+  }, [fetchLines]);
+
+  const deleteLine = useCallback(async (lineId: string) => {
+    const deleted = await apiClient.deleteLine(lineId);
+    await fetchLines();
+    return deleted;
+  }, [fetchLines]);
 
   const value: AppContextType = useMemo(
     () => ({
+      currentLineId,
+      setLineId,
+      setCurrentLineId,
+      currentRole,
+      setRole,
+      lines,
+      isConnected,
+      refreshLines,
+      fetchLines,
+      createLine,
+      updateLine,
+      deleteLine,
+    }),
+    [
       currentLineId,
       setLineId,
       currentRole,
@@ -83,8 +124,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({
       lines,
       isConnected,
       refreshLines,
-    }),
-    [currentLineId, currentRole, lines, isConnected, refreshLines]
+      fetchLines,
+      createLine,
+      updateLine,
+      deleteLine,
+    ]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

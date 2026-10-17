@@ -3,12 +3,12 @@ import type {
   AlarmPatchPayload,
   AlarmQueryParams,
   CountQueryParams,
+  CreateLinePayload,
+  Line,
   LineCountsResponse,
-  LineDetailDTO,
-  LineItem,
   LineSummaryResponse,
-  LineUpdatePayload,
   LoginResponse,
+  UpdateLinePayload,
   UserDTO,
 } from "../types";
 
@@ -130,11 +130,38 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
   return response.json() as Promise<T>;
 }
 
+export const api = {
+  get: async <T>(endpoint: string, options?: RequestInit) => {
+    const data = await request<T>(endpoint, { ...options, method: "GET" });
+    return { data };
+  },
+  post: async <T>(endpoint: string, body?: unknown, options?: RequestInit) => {
+    const data = await request<T>(endpoint, {
+      ...options,
+      method: "POST",
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { data };
+  },
+  put: async <T>(endpoint: string, body?: unknown, options?: RequestInit) => {
+    const data = await request<T>(endpoint, {
+      ...options,
+      method: "PUT",
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { data };
+  },
+  delete: async <T>(endpoint: string, options?: RequestInit) => {
+    const data = await request<T>(endpoint, { ...options, method: "DELETE" });
+    return { data };
+  },
+};
+
 /**
  * Fetch all configured production lines with live status summary.
  */
-export async function getLines(): Promise<LineItem[]> {
-  return request<LineItem[]>("/api/v1/lines");
+export async function getLines(): Promise<Line[]> {
+  return request<Line[]>("/api/v1/lines");
 }
 
 /**
@@ -197,16 +224,30 @@ export async function patchAlarm(
 }
 
 /**
+ * Create a new production line.
+ */
+export async function createLine(payload: CreateLinePayload): Promise<Line> {
+  const { data } = await api.post<Line>("/api/v1/lines", payload);
+  return data;
+}
+
+/**
  * Update line parameters (name, target, active state).
  */
 export async function updateLine(
   lineId: string,
-  payload: LineUpdatePayload
-): Promise<LineDetailDTO> {
-  return request<LineDetailDTO>(`/api/v1/lines/${encodeURIComponent(lineId)}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
+  payload: UpdateLinePayload
+): Promise<Line> {
+  const { data } = await api.put<Line>(`/api/v1/lines/${encodeURIComponent(lineId)}`, payload);
+  return data;
+}
+
+/**
+ * Delete (soft delete) a production line.
+ */
+export async function deleteLine(lineId: string): Promise<Line> {
+  const { data } = await api.delete<Line>(`/api/v1/lines/${encodeURIComponent(lineId)}`);
+  return data;
 }
 
 /**
@@ -313,7 +354,9 @@ export const apiClient = {
   getLineCounts,
   getAlarms,
   patchAlarm,
+  createLine,
   updateLine,
+  deleteLine,
   login,
   getMe,
   getExportUrl,
