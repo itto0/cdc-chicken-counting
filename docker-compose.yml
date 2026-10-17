@@ -6,10 +6,10 @@ services:
     container_name: cdc_postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
       POSTGRES_DB: chicken_counting
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -28,7 +28,7 @@ services:
     ports:
       - "${PORT:-8070}:${PORT:-8070}"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgrespassword@postgres:5432/chicken_counting
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/chicken_counting
       - VIDEO_PATH=/samples/Rekaman_2.MOV
     volumes:
       - ./samples:/samples:ro
