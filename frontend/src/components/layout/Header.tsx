@@ -18,7 +18,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
         .list()
         .then((alarms) => {
           if (isMounted && Array.isArray(alarms)) {
-            const count = alarms.filter((a) => a.status === "ACTIVE").length;
+            const count = alarms.filter((a) => a.status !== "RESOLVED").length;
             setActiveCount(count);
           }
         })

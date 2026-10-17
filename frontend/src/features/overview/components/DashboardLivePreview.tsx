@@ -22,25 +22,17 @@ export function DashboardLivePreview({
 }: DashboardLivePreviewProps) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [imgError, setImgError] = useState(false);
-  const [clock, setClock] = useState(() =>
-    new Date().toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    })
-  );
+  const formatClock = () => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+
+  const [clock, setClock] = useState(formatClock);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setClock(
-        new Date().toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false,
-        })
-      );
+      setClock(formatClock());
     }, 1000);
     return () => clearInterval(timer);
   }, []);

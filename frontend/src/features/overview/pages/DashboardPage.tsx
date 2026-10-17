@@ -14,7 +14,7 @@ const FALLBACK_SUMMARY: LineSummaryResponse = {
   line_id: "line-1",
   period: "today",
   total_count: 0,
-  target_count: 60000,
+  target_count: 62000,
   target_attainment_pct: 0.0,
   current_speed_cpm: 0.0,
   target_speed_cpm: 120.0,
@@ -72,7 +72,7 @@ export default function DashboardPage() {
   const liveSummary = useMemo<LineSummaryResponse>(() => {
     const total = totalToday > 0 ? totalToday : summary.total_count;
     const speed = liveSpeed > 0 ? liveSpeed : summary.current_speed_cpm;
-    const target = summary.target_count || 60000;
+    const target = summary.target_count || 62000;
     const attainment = target > 0 ? Number(((total / target) * 100).toFixed(1)) : 0;
 
     return {

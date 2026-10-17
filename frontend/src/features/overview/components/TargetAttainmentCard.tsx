@@ -19,7 +19,7 @@ export function TargetAttainmentCard({
         : 0;
   const displayPercentage = Math.round(calculatedPct);
   const percentage = Math.min(Math.max(displayPercentage, 0), 100);
-  const targetFormatted = (target || 60000).toLocaleString("id-ID");
+  const targetFormatted = (target || 62000).toLocaleString("id-ID");
 
   // SVG circular gauge math
   const radius = 38;
