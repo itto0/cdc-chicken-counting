@@ -190,7 +190,7 @@ def test_export_pdf_report_special_characters(pdf_client):
     res = pdf_client.get("/api/v1/reports/export?line_id=line%26test%3C1%3E&format=pdf")
     assert res.status_code == 200
     assert res.headers["content-type"] == "application/pdf"
-    assert res.headers["content-disposition"] == 'attachment; filename="report_line&test<1>.pdf"'
+    assert res.headers["content-disposition"] == 'attachment; filename="report_line_test_1_.pdf"'
     assert res.content.startswith(b"%PDF")
 
 
@@ -208,3 +208,105 @@ def test_pdf_report_generator_special_characters():
     assert pdf_bytes_unescaped.startswith(b"%PDF")
 
 
+def test_pdf_report_generator_multiline_column_layout():
+    from reportlab.platypus import Table
+    from services.api.src.services.pdf_exporter import PDFReportGenerator
+
+    generator = PDFReportGenerator()
+
+    # 1. Multi-line via line_id="Semua Lini"
+    elements_multi_1 = generator._build_elements("Semua Lini", [])
+    tables_1 = [e for e in elements_multi_1 if isinstance(e, Table)]
+    assert len(tables_1) == 2
+    records_table_1 = tables_1[1]
+    assert records_table_1._cellvalues[0] == ["Interval Start", "Line", "Count", "Speed (cpm)", "Status"]
+    assert records_table_1._argW == [120, 90, 80, 90, 80]
+
+    # 2. Multi-line via line_id="all"
+    elements_multi_2 = generator._build_elements("all", [])
+    tables_2 = [e for e in elements_multi_2 if isinstance(e, Table)]
+    assert tables_2[1]._cellvalues[0] == ["Interval Start", "Line", "Count", "Speed (cpm)", "Status"]
+    assert tables_2[1]._argW == [120, 90, 80, 90, 80]
+
+    # 3. Multi-line via records having line_id
+    records_with_line = [
+        {"window_start": "2026-10-17 10:00", "line_id": "line-2", "count": 50, "rate_per_min": 50.0, "status": "NORMAL"}
+    ]
+    elements_multi_3 = generator._build_elements("line-custom", records_with_line)
+    tables_3 = [e for e in elements_multi_3 if isinstance(e, Table)]
+    assert tables_3[1]._cellvalues[0] == ["Interval Start", "Line", "Count", "Speed (cpm)", "Status"]
+    assert tables_3[1]._cellvalues[1] == ["2026-10-17 10:00", "line-2", "50", "50.0", "NORMAL"]
+    assert tables_3[1]._argW == [120, 90, 80, 90, 80]
+
+    # 4. Single-line without line_id in records and line_id not "all"/"semua lini"
+    records_single = [
+        {"window_start": "2026-10-17 10:00", "count": 50, "rate_per_min": 50.0, "status": "NORMAL"}
+    ]
+    elements_single = generator._build_elements("line-1", records_single)
+    tables_single = [e for e in elements_single if isinstance(e, Table)]
+    assert tables_single[1]._cellvalues[0] == ["Interval Start", "Count", "Speed (cpm)", "Status"]
+    assert tables_single[1]._cellvalues[1] == ["2026-10-17 10:00", "50", "50.0", "NORMAL"]
+    assert tables_single[1]._argW == [180, 100, 120, 100]
+
+
+def test_export_report_tie_breaking_order():
+    import openpyxl
+    from reportlab.platypus import Table
+    from services.api.src.db.models import CountAggregate
+    from services.api.src.db.session import get_db
+    from services.api.src.main import app
+
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine)
+    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+    db = TestingSession()
+    same_time = datetime(2026, 10, 17, 10, 0, 0, tzinfo=timezone.utc)
+    # Add line-B first, then line-A
+    db.add(CountAggregate(
+        line_id="line-B",
+        window_start=same_time,
+        window_end=same_time + timedelta(minutes=1),
+        count=200,
+        rate_per_min=100.0,
+        confidence_avg=0.95,
+        status="NORMAL",
+    ))
+    db.add(CountAggregate(
+        line_id="line-A",
+        window_start=same_time,
+        window_end=same_time + timedelta(minutes=1),
+        count=150,
+        rate_per_min=90.0,
+        confidence_avg=0.95,
+        status="NORMAL",
+    ))
+    db.commit()
+    db.close()
+
+    def override_db():
+        session = TestingSession()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        client = TestClient(app)
+        res = client.get("/api/v1/reports/export?line_id=all&format=xlsx")
+        assert res.status_code == 200
+        wb = openpyxl.load_workbook(io.BytesIO(res.content))
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+        # Header is row 0: ("Timestamp (WIB)", "Line", "Count", "Rate (birds/min)", "Status")
+        # Row 1 must be line-A (tie breaker order asc), Row 2 must be line-B
+        assert rows[1][1] == "line-A"
+        assert rows[2][1] == "line-B"
+    finally:
+        app.dependency_overrides.clear()
+        engine.dispose()

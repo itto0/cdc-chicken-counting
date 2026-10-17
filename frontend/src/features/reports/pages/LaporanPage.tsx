@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { AlertCircle, X } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { useAppContext } from "@/context/AppContext";
@@ -14,6 +15,7 @@ export default function LaporanPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [rawRows, setRawRows] = useState<ReportRowItem[]>([]);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // Compute time range for filters
   const { startTime, endTime } = useMemo(() => {
@@ -78,6 +80,7 @@ export default function LaporanPage() {
             items.push({
               id: `${line.id}-${agg.bucket}-${idx}`,
               timestamp: `${dateStr}, ${hourStr}`,
+              rawTimestamp: agg.bucket,
               lineName: line.name || line.id,
               count: agg.count ?? 0,
               ratePerMin: agg.rate_per_min ?? 0,
@@ -89,8 +92,17 @@ export default function LaporanPage() {
         }
       });
 
-      // Sensible Indonesian fallback rows if no data exists
-      if (items.length === 0) {
+      // Chronological Sorting: sort items descending by rawTimestamp so newest intervals appear first across all lines
+      items.sort((a, b) => {
+        const timeA = a.rawTimestamp ? new Date(a.rawTimestamp).getTime() : 0;
+        const timeB = b.rawTimestamp ? new Date(b.rawTimestamp).getTime() : 0;
+        return timeB - timeA;
+      });
+
+      // Only inject fallback sample rows if all requests failed (network error / res === null across all lines).
+      // If the backend successfully responded with empty data (res.aggregates = []), do NOT inject sample rows.
+      const allFailed = results.length > 0 && results.every(({ res }) => res === null);
+      if (allFailed && items.length === 0) {
         const isAll = selectedLineId === "all";
         const line1Name = isAll
           ? "Lini 1 - Utama"
@@ -101,6 +113,7 @@ export default function LaporanPage() {
           {
             id: "sample-1",
             timestamp: "17 Okt 2026, 14:00 - 15:00",
+            rawTimestamp: "2026-10-17T14:00:00Z",
             lineName: line1Name,
             count: 7120,
             ratePerMin: 119,
@@ -110,6 +123,7 @@ export default function LaporanPage() {
           {
             id: "sample-2",
             timestamp: "17 Okt 2026, 13:00 - 14:00",
+            rawTimestamp: "2026-10-17T13:00:00Z",
             lineName: line1Name,
             count: 6840,
             ratePerMin: 114,
@@ -119,6 +133,7 @@ export default function LaporanPage() {
           {
             id: "sample-3",
             timestamp: "17 Okt 2026, 12:00 - 13:00",
+            rawTimestamp: "2026-10-17T12:00:00Z",
             lineName: line2Name,
             count: 7300,
             ratePerMin: 122,
@@ -128,6 +143,7 @@ export default function LaporanPage() {
           {
             id: "sample-4",
             timestamp: "17 Okt 2026, 11:00 - 12:00",
+            rawTimestamp: "2026-10-17T11:00:00Z",
             lineName: line2Name,
             count: 5950,
             ratePerMin: 99,
@@ -164,12 +180,12 @@ export default function LaporanPage() {
       filteredRows.length > 0
         ? filteredRows.reduce((acc, curr) => acc + (curr.ratePerMin || 0), 0) /
           filteredRows.length
-        : 118;
+        : 0;
     const avgAccuracyPct =
       filteredRows.length > 0
         ? filteredRows.reduce((acc, curr) => acc + (curr.accuracyPct || 99.2), 0) /
           filteredRows.length
-        : 99.1;
+        : 0;
     const totalOperationMinutes = filteredRows.length * 60;
 
     return {
@@ -182,6 +198,7 @@ export default function LaporanPage() {
 
   const handleExport = async (format: "pdf" | "xlsx") => {
     try {
+      setExportError(null);
       setIsExporting(true);
       await reportsApi.downloadReport({
         lineId: selectedLineId,
@@ -191,6 +208,7 @@ export default function LaporanPage() {
       });
     } catch (err) {
       console.error("Failed to export report:", err);
+      setExportError(err instanceof Error ? err.message : "Gagal mengunduh laporan");
     } finally {
       setIsExporting(false);
     }
@@ -204,6 +222,26 @@ export default function LaporanPage() {
       >
         <StatusBadge isConnected={isConnected} />
       </PageHeader>
+
+      {exportError && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-3 p-3.5 px-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm animate-in fade-in"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" aria-hidden="true" />
+            <span className="truncate">{exportError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setExportError(null)}
+            className="p-1 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-100 transition-colors shrink-0"
+            aria-label="Tutup pesan kesalahan"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       <ReportFilterBar
         period={period}

@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
@@ -53,7 +54,7 @@ def export_report(
         end_dt = _parse_filter_datetime(end_time)
         query = query.where(CountAggregate.window_start <= end_dt)
 
-    query = query.order_by(CountAggregate.window_start.asc())
+    query = query.order_by(CountAggregate.window_start.asc(), CountAggregate.line_id.asc())
     aggregates = db.scalars(query).all()
 
     records = [
@@ -68,7 +69,8 @@ def export_report(
     ]
 
     display_line_name = "Semua Lini" if is_all_lines else line_id
-    safe_filename = "report_semua_lini" if is_all_lines else f"report_{line_id}"
+    clean_line_id = re.sub(r"[^a-zA-Z0-9_\-]", "_", line_id)
+    safe_filename = "report_semua_lini" if is_all_lines else f"report_{clean_line_id}"
 
     if fmt == "pdf":
         pdf_generator = PDFReportGenerator()

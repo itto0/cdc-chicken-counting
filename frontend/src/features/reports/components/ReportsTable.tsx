@@ -7,6 +7,7 @@ import type { AggregateItemDTO } from "@/types";
 export interface ReportRowItem {
   id: string;
   timestamp: string;
+  rawTimestamp?: string;
   lineName: string;
   count: number;
   ratePerMin: number;
@@ -29,6 +30,7 @@ function normalizeRow(item: ReportRowItem | AggregateItemDTO, index: number): Re
     return {
       id: `agg-${index}`,
       timestamp: item.bucket,
+      rawTimestamp: item.bucket,
       lineName: "Lini Utama",
       count: item.count ?? 0,
       ratePerMin: item.rate_per_min ?? 0,

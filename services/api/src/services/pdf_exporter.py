@@ -9,7 +9,12 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 
 class PDFReportGenerator:
-    def _build_elements(self, line_id: str, records: Sequence[dict[str, Any]]) -> list[Any]:
+    def _build_elements(
+        self,
+        line_id: str,
+        records: Sequence[dict[str, Any]],
+        is_multi_line: bool | None = None,
+    ) -> list[Any]:
         elements: list[Any] = []
         styles = getSampleStyleSheet()
 
@@ -59,8 +64,19 @@ class PDFReportGenerator:
         elements.append(summary_table)
         elements.append(Spacer(1, 20))
 
+        if is_multi_line is None:
+            is_multi_line = str(line_id).lower() in ("semua lini", "all") or any(
+                r.get("line_id") for r in records
+            )
+
         # Details Table
-        table_data = [["Interval Start", "Count", "Speed (cpm)", "Status"]]
+        if is_multi_line:
+            table_data = [["Interval Start", "Line", "Count", "Speed (cpm)", "Status"]]
+            col_widths = [120, 90, 80, 90, 80]
+        else:
+            table_data = [["Interval Start", "Count", "Speed (cpm)", "Status"]]
+            col_widths = [180, 100, 120, 100]
+
         for r in records[:50]:  # limit for PDF layout
             ws = r.get("window_start")
             if hasattr(ws, "strftime"):
@@ -72,16 +88,28 @@ class PDFReportGenerator:
             cnt = r.get("count") or 0
             rate = r.get("rate_per_min") or 0
             status = r.get("status") or "NORMAL"
-            table_data.append(
-                [
-                    ws_str,
-                    str(cnt),
-                    str(round(rate, 1)),
-                    str(status),
-                ]
-            )
+            if is_multi_line:
+                line_val = str(r.get("line_id") or line_id)
+                table_data.append(
+                    [
+                        ws_str,
+                        line_val,
+                        str(cnt),
+                        str(round(rate, 1)),
+                        str(status),
+                    ]
+                )
+            else:
+                table_data.append(
+                    [
+                        ws_str,
+                        str(cnt),
+                        str(round(rate, 1)),
+                        str(status),
+                    ]
+                )
 
-        records_table = Table(table_data, colWidths=[180, 100, 120, 100], repeatRows=1)
+        records_table = Table(table_data, colWidths=col_widths, repeatRows=1)
         records_table.setStyle(
             TableStyle(
                 [
@@ -113,6 +141,9 @@ class PDFReportGenerator:
         return elements
 
     def generate_line_report(self, line_id: str, records: Sequence[dict[str, Any]]) -> bytes:
+        is_multi_line = str(line_id).lower() in ("semua lini", "all") or any(
+            r.get("line_id") for r in records
+        )
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
             buffer,
@@ -122,7 +153,7 @@ class PDFReportGenerator:
             topMargin=36,
             bottomMargin=36,
         )
-        elements = self._build_elements(line_id=line_id, records=records)
+        elements = self._build_elements(line_id=line_id, records=records, is_multi_line=is_multi_line)
         doc.build(elements)
         buffer.seek(0)
         return buffer.getvalue()
