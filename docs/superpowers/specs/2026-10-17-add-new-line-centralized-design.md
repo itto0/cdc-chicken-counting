@@ -116,7 +116,7 @@ class Line(Base):
 - Soft deletes by setting `is_active = False` to prevent foreign key or historical data breakage.
 
 ### 5. `GET /api/v1/lines/{line_id}/preview`
-- Inspects `line.video_url`. If set and accessible, frames are captured from the RTSP/video source. If absent or unreachable, falls back to the synthetic frame generator with an offline camera status.
+- Inspects `line.video_url`. The `video_url` is stored centrally in PostgreSQL/SQLite and pulled by edge counter instances during startup. (Direct live camera proxy ingestion within the API container is reserved for the upcoming RTSP streaming proxy milestone; current preview generator uses configured video samples or synthetic generator).
 
 ---
 
