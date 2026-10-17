@@ -49,6 +49,7 @@ export interface LineSummaryResponse {
   last_event_time: string | null;
   fps: number;
   latency_p95_ms: number;
+  detection_accuracy_pct?: number;
 }
 
 export interface AggregateItemDTO {
