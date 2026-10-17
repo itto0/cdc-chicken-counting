@@ -119,6 +119,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     [
       currentLineId,
       setLineId,
+      setCurrentLineId,
       currentRole,
       setRole,
       lines,

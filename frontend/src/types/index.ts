@@ -26,8 +26,8 @@ export interface CreateLinePayload {
 export interface UpdateLinePayload {
   name?: string;
   daily_target?: number;
-  video_url?: string;
-  line_coords?: string;
+  video_url?: string | null;
+  line_coords?: string | null;
   line_direction?: string;
   is_active?: boolean;
 }
