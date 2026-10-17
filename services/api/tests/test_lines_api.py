@@ -125,3 +125,111 @@ def test_update_line_daily_target_validation(lines_client):
     res_valid = lines_client.put("/api/v1/lines/line-1", json={"daily_target": 90000})
     assert res_valid.status_code == 200
     assert res_valid.json()["daily_target"] == 90000
+
+
+def test_create_line_success(lines_client):
+    client = lines_client
+    payload = {
+        "id": "line-new-1",
+        "name": "New Conveyor 1",
+        "daily_target": 75000,
+        "video_url": "rtsp://camera1/stream",
+        "line_coords": "0,240,640,240",
+        "line_direction": "down",
+        "is_active": True,
+    }
+    resp = client.post("/api/v1/lines", json=payload)
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["id"] == "line-new-1"
+    assert data["name"] == "New Conveyor 1"
+    assert data["daily_target"] == 75000
+    assert data["video_url"] == "rtsp://camera1/stream"
+    assert data["line_coords"] == "0,240,640,240"
+    assert data["line_direction"] == "down"
+    assert data["is_active"] is True
+
+
+def test_create_line_duplicate_id(lines_client):
+    client = lines_client
+    payload = {
+        "id": "line-dup",
+        "name": "Conveyor Duplicate",
+        "daily_target": 50000,
+    }
+    resp1 = client.post("/api/v1/lines", json=payload)
+    assert resp1.status_code == 201
+
+    resp2 = client.post("/api/v1/lines", json=payload)
+    assert resp2.status_code == 409
+    assert "already exists" in resp2.json()["detail"].lower()
+
+
+def test_create_line_invalid_coords_and_direction(lines_client):
+    client = lines_client
+    # Bad coordinates (only 2 numbers)
+    resp = client.post("/api/v1/lines", json={
+        "id": "line-bad-coords",
+        "name": "Bad Coords",
+        "line_coords": "100,200",
+    })
+    assert resp.status_code == 422
+
+    # Bad direction
+    resp2 = client.post("/api/v1/lines", json={
+        "id": "line-bad-dir",
+        "name": "Bad Dir",
+        "line_direction": "diagonal_up",
+    })
+    assert resp2.status_code == 422
+
+
+def test_soft_delete_line(lines_client):
+    client = lines_client
+    line_id = "line-to-delete"
+    client.post("/api/v1/lines", json={"id": line_id, "name": "Line To Delete"})
+
+    resp = client.delete(f"/api/v1/lines/{line_id}")
+    assert resp.status_code == 200
+    assert resp.json()["is_active"] is False
+
+    # Check detail shows is_active is False
+    detail = client.get(f"/api/v1/lines/{line_id}").json()
+    assert detail["is_active"] is False
+
+
+def test_delete_nonexistent_line(lines_client):
+    client = lines_client
+    resp = client.delete("/api/v1/lines/non-existent-line")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Line not found"
+
+
+def test_update_line_extended_fields(lines_client):
+    client = lines_client
+    update_payload = {
+        "video_url": "rtsp://camera2/stream",
+        "line_coords": "10,20,300,400",
+        "line_direction": "up",
+        "is_active": False,
+    }
+    resp = client.put("/api/v1/lines/line-1", json=update_payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["video_url"] == "rtsp://camera2/stream"
+    assert data["line_coords"] == "10,20,300,400"
+    assert data["line_direction"] == "up"
+    assert data["is_active"] is False
+
+
+def test_update_line_invalid_coords_and_direction(lines_client):
+    client = lines_client
+    # Invalid coords on update
+    resp1 = client.put("/api/v1/lines/line-1", json={"line_coords": "not,valid,coords,abc"})
+    assert resp1.status_code == 422
+
+    # Invalid direction on update
+    resp2 = client.put("/api/v1/lines/line-1", json={"line_direction": "diagonal"})
+    assert resp2.status_code == 422
+
+

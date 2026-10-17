@@ -1,7 +1,8 @@
+import re
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from services.api.src.db.models import Line, HealthSample, CountEvent
@@ -9,17 +10,85 @@ from services.api.src.db.session import get_db
 
 router = APIRouter(prefix="/api/v1/lines", tags=["lines"])
 
+VALID_DIRECTIONS = ("down", "up", "left", "right", "in", "out")
+
+
+def validate_coords_format(coords: Optional[str]) -> Optional[str]:
+    if coords is None or coords.strip() == "":
+        return None
+    parts = [p.strip() for p in coords.split(",")]
+    if len(parts) != 4:
+        raise ValueError("line_coords must contain 4 comma-separated numbers (x1,y1,x2,y2)")
+    for p in parts:
+        try:
+            float(p)
+        except ValueError:
+            raise ValueError("All coordinates in line_coords must be valid numbers")
+    return coords.strip()
+
+
+class LineCreatePayload(BaseModel):
+    id: str = Field(..., min_length=2, max_length=50, description="Alphanumeric slug, e.g. 'line-2'")
+    name: str = Field(..., min_length=1, max_length=100)
+    daily_target: int = Field(60000, gt=0)
+    video_url: Optional[str] = Field(None, max_length=500)
+    line_coords: Optional[str] = Field(None, max_length=100)
+    line_direction: str = Field("down")
+    is_active: bool = True
+
+    @field_validator("id")
+    @classmethod
+    def validate_id_slug(cls, v: str) -> str:
+        v = v.strip()
+        if not re.match(r"^[a-zA-Z0-9_-]+$", v):
+            raise ValueError("id must contain only letters, numbers, hyphens, and underscores")
+        return v
+
+    @field_validator("line_coords")
+    @classmethod
+    def validate_coords(cls, v: Optional[str]) -> Optional[str]:
+        return validate_coords_format(v)
+
+    @field_validator("line_direction")
+    @classmethod
+    def validate_direction(cls, v: str) -> str:
+        v = v.lower().strip()
+        if v not in VALID_DIRECTIONS:
+            raise ValueError(f"line_direction must be one of {VALID_DIRECTIONS}")
+        return v
+
 
 class LineUpdatePayload(BaseModel):
     name: Optional[str] = None
     daily_target: Optional[int] = Field(None, gt=0)
+    video_url: Optional[str] = None
+    line_coords: Optional[str] = None
+    line_direction: Optional[str] = None
     is_active: Optional[bool] = None
+
+    @field_validator("line_coords")
+    @classmethod
+    def validate_coords(cls, v: Optional[str]) -> Optional[str]:
+        return validate_coords_format(v)
+
+    @field_validator("line_direction")
+    @classmethod
+    def validate_direction(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        v = v.lower().strip()
+        if v not in VALID_DIRECTIONS:
+            raise ValueError(f"line_direction must be one of {VALID_DIRECTIONS}")
+        return v
 
 
 class LineStatusDTO(BaseModel):
     id: str
     name: str
     daily_target: int
+    video_url: Optional[str] = None
+    line_coords: Optional[str] = None
+    line_direction: str = "down"
     is_active: bool
     status: str
     last_ping: Optional[str] = None
@@ -30,7 +99,42 @@ class LineDetailDTO(BaseModel):
     id: str
     name: str
     daily_target: int
+    video_url: Optional[str] = None
+    line_coords: Optional[str] = None
+    line_direction: str = "down"
     is_active: bool
+
+
+@router.post("", response_model=LineDetailDTO, status_code=status.HTTP_201_CREATED)
+def create_line(payload: LineCreatePayload, db: Session = Depends(get_db)):
+    existing = db.get(Line, payload.id)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Line with ID '{payload.id}' already exists",
+        )
+
+    new_line = Line(
+        id=payload.id,
+        name=payload.name,
+        daily_target=payload.daily_target,
+        video_url=payload.video_url,
+        line_coords=payload.line_coords,
+        line_direction=payload.line_direction,
+        is_active=payload.is_active,
+    )
+    db.add(new_line)
+    db.commit()
+    db.refresh(new_line)
+    return LineDetailDTO(
+        id=new_line.id,
+        name=new_line.name,
+        daily_target=new_line.daily_target,
+        video_url=new_line.video_url,
+        line_coords=new_line.line_coords,
+        line_direction=new_line.line_direction or "down",
+        is_active=new_line.is_active,
+    )
 
 
 @router.get("", response_model=list[LineStatusDTO])
@@ -41,7 +145,6 @@ def list_lines(db: Session = Depends(get_db)):
 
     result = []
     for line in lines:
-        # Latest health sample
         latest_health = db.scalars(
             select(HealthSample)
             .where(HealthSample.line_id == line.id)
@@ -49,7 +152,7 @@ def list_lines(db: Session = Depends(get_db)):
             .limit(1)
         ).first()
 
-        status = "offline"
+        status_str = "offline"
         last_ping_str = None
         if latest_health:
             last_ping_str = latest_health.timestamp.isoformat()
@@ -57,11 +160,10 @@ def list_lines(db: Session = Depends(get_db)):
             if ts.tzinfo is None:
                 ts = ts.replace(tzinfo=timezone.utc)
             if now - ts <= timedelta(seconds=60):
-                status = latest_health.stream_state.lower()
+                status_str = latest_health.stream_state.lower()
             else:
-                status = "offline"
+                status_str = "offline"
 
-        # Count today
         count = db.scalar(
             select(func.count(CountEvent.id))
             .where(CountEvent.line_id == line.id)
@@ -73,8 +175,11 @@ def list_lines(db: Session = Depends(get_db)):
                 id=line.id,
                 name=line.name,
                 daily_target=line.daily_target,
+                video_url=line.video_url,
+                line_coords=line.line_coords,
+                line_direction=line.line_direction or "down",
                 is_active=line.is_active,
-                status=status,
+                status=status_str,
                 last_ping=last_ping_str,
                 total_today=count,
             )
@@ -91,6 +196,9 @@ def get_line(line_id: str, db: Session = Depends(get_db)):
         id=line.id,
         name=line.name,
         daily_target=line.daily_target,
+        video_url=line.video_url,
+        line_coords=line.line_coords,
+        line_direction=line.line_direction or "down",
         is_active=line.is_active,
     )
 
@@ -104,6 +212,12 @@ def update_line(line_id: str, payload: LineUpdatePayload, db: Session = Depends(
         line.name = payload.name
     if payload.daily_target is not None:
         line.daily_target = payload.daily_target
+    if payload.video_url is not None:
+        line.video_url = payload.video_url
+    if payload.line_coords is not None:
+        line.line_coords = payload.line_coords
+    if payload.line_direction is not None:
+        line.line_direction = payload.line_direction
     if payload.is_active is not None:
         line.is_active = payload.is_active
     db.commit()
@@ -112,5 +226,27 @@ def update_line(line_id: str, payload: LineUpdatePayload, db: Session = Depends(
         id=line.id,
         name=line.name,
         daily_target=line.daily_target,
+        video_url=line.video_url,
+        line_coords=line.line_coords,
+        line_direction=line.line_direction or "down",
+        is_active=line.is_active,
+    )
+
+
+@router.delete("/{line_id}", response_model=LineDetailDTO)
+def delete_line(line_id: str, db: Session = Depends(get_db)):
+    line = db.get(Line, line_id)
+    if not line:
+        raise HTTPException(status_code=404, detail="Line not found")
+    line.is_active = False
+    db.commit()
+    db.refresh(line)
+    return LineDetailDTO(
+        id=line.id,
+        name=line.name,
+        daily_target=line.daily_target,
+        video_url=line.video_url,
+        line_coords=line.line_coords,
+        line_direction=line.line_direction or "down",
         is_active=line.is_active,
     )

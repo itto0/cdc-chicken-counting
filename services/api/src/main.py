@@ -25,12 +25,29 @@ def init_db(target_engine=None) -> None:
     eng = target_engine or engine
     Base.metadata.create_all(bind=eng)
     with Session(eng) as session:
-        if not session.scalar(select(Line).limit(1)):
-            session.add_all([
-                Line(id="line-1", name="Lini Konveyor 1", daily_target=60000, is_active=True),
-                Line(id="lineA", name="Lini Konveyor A", daily_target=62000, is_active=True),
-            ])
-            session.commit()
+        if not session.get(Line, "line-1"):
+            session.add(
+                Line(
+                    id="line-1",
+                    name="Lini Konveyor 1",
+                    daily_target=62000,
+                    line_direction="right",
+                    line_coords="0,240,640,240",
+                    is_active=True,
+                )
+            )
+        if not session.get(Line, "lineA"):
+            session.add(
+                Line(
+                    id="lineA",
+                    name="Lini Konveyor A",
+                    daily_target=62000,
+                    line_direction="down",
+                    line_coords="0,240,640,240",
+                    is_active=True,
+                )
+            )
+        session.commit()
 
 
 @asynccontextmanager
