@@ -49,7 +49,7 @@ export function KpiCards({ summary }: KpiCardsProps) {
             <p className="text-xs font-normal text-slate-500">Laju Rata-rata</p>
             <div className="flex items-baseline gap-1.5 mt-2">
               <span className="text-2xl font-bold tracking-tight text-slate-900">
-                {Math.round(summary.current_speed_cpm || 120)}
+                {Math.round(summary.current_speed_cpm ?? 120).toLocaleString("id-ID")}
               </span>
               <span className="text-xs font-semibold text-slate-700">ekor/menit</span>
             </div>
