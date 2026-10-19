@@ -8,25 +8,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies
-RUN pip install --no-cache-dir \
-    "opencv-python-headless>=4.8.0" \
-    "numpy>=1.24.0" \
-    "pydantic>=2.5.0" \
-    "httpx>=0.27.0" \
-    "python-dotenv>=1.0.0"
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy shared code and service code
-COPY shared /app/shared
-COPY services/counter /app/services/counter
+# Copy only counter service files (completely self-contained)
+COPY . /app
 
 # Create data directory for local outbox SQLite database
 RUN mkdir -p /data /app/data
 
 ENV PYTHONPATH=/app
-ENV LINE_ID=lineA
+ENV LINE_ID=line-1
 ENV VIDEO_SOURCE_TYPE=synthetic
-ENV API_SYNC_URL=http://api:8000/api/v1/sync/batch
+ENV API_SYNC_URL=http://localhost:8000/api/v1/sync/batch
 ENV DB_PATH=/data/counter_outbox.db
 ENV SYNC_INTERVAL_SEC=5.0
 
-CMD ["python", "services/counter/main.py"]
+CMD ["python", "main.py"]

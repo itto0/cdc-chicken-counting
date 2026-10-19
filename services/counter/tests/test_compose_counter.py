@@ -14,8 +14,8 @@ def test_counter_compose_structure():
     assert "counter" in config["services"], "counter service must be defined"
 
     counter = config["services"]["counter"]
-    assert counter["build"]["context"] == "."
-    assert counter["build"]["dockerfile"] == "services/counter/Dockerfile"
+    assert counter["build"]["context"] in ("./services/counter", "services/counter")
+    assert counter["build"]["dockerfile"] == "Dockerfile"
     assert counter["restart"] == "unless-stopped"
 
     # Environment checks

@@ -3,8 +3,8 @@ version: "3.8"
 services:
   counter:
     build:
-      context: .
-      dockerfile: services/counter/Dockerfile
+      context: ./services/counter
+      dockerfile: Dockerfile
     container_name: cdc-counter
     restart: unless-stopped
     environment:
