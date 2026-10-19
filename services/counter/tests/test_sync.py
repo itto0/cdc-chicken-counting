@@ -246,3 +246,34 @@ def test_sync_dispatcher_default_http_client_and_context_manager(tmp_path):
     )
     d2.close()
     mock_client.close.assert_called_once()
+
+
+def test_sync_dispatcher_sends_authorization_header_when_api_token_set(tmp_path):
+    storage = LocalStorage(db_path=str(tmp_path / "sync.db"))
+    storage.init_db()
+    storage.insert_event(
+        "lineA",
+        CountEventDTO(
+            track_id=1,
+            ts_utc=datetime.now(timezone.utc),
+            confidence=0.9,
+        ),
+    )
+
+    mock_http_client = MagicMock()
+    mock_http_client.post.return_value.status_code = 200
+
+    dispatcher = OutboxSyncDispatcher(
+        storage=storage,
+        api_url="http://mock-api/api/v1/sync/batch",
+        line_id="lineA",
+        http_client=mock_http_client,
+        api_token="cdc_live_test_token_123",
+    )
+
+    synced_count = dispatcher.sync_once()
+    assert synced_count == 1
+    mock_http_client.post.assert_called_once()
+    _, kwargs = mock_http_client.post.call_args
+    assert kwargs.get("headers") == {"Authorization": "Bearer cdc_live_test_token_123"}
+

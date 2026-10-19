@@ -14,6 +14,7 @@ services:
       - LINE_DIRECTION=${LINE_DIRECTION:-right}
       - TARGET_FPS=${TARGET_FPS:-30.0}
       - API_SYNC_URL=${API_SYNC_URL:-https://cdc-api.onrender.com/api/v1/sync/batch}
+      - API_TOKEN=${API_TOKEN:-}
       - DB_PATH=/data/counter_outbox.db
       - SYNC_INTERVAL_SEC=${SYNC_INTERVAL_SEC:-5.0}
       - HEALTH_INTERVAL_SEC=${HEALTH_INTERVAL_SEC:-10.0}

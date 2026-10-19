@@ -28,6 +28,7 @@ class OutboxSyncDispatcher:
         batch_limit: int = 100,
         timeout: float = 5.0,
         max_backoff_sec: float = 30.0,
+        api_token: str | None = None,
     ) -> None:
         self.storage = storage
         self.api_url = api_url
@@ -38,6 +39,7 @@ class OutboxSyncDispatcher:
         self.timeout = timeout
         self.backoff_sec = 1.0
         self.max_backoff_sec = max_backoff_sec
+        self.api_token = api_token
 
     def sync_once(self) -> int:
         """
@@ -62,10 +64,16 @@ class OutboxSyncDispatcher:
             return 0
 
         try:
+            req_kwargs: dict[str, Any] = {
+                "json": payload.model_dump(mode="json"),
+                "timeout": self.timeout,
+            }
+            if self.api_token and self.api_token.strip():
+                req_kwargs["headers"] = {"Authorization": f"Bearer {self.api_token.strip()}"}
+
             resp = self.http_client.post(
                 self.api_url,
-                json=payload.model_dump(mode="json"),
-                timeout=self.timeout,
+                **req_kwargs,
             )
             if resp.status_code in (200, 201):
                 if event_ids:

@@ -83,6 +83,7 @@ class CounterService:
         video_source_type: str = "synthetic",
         video_path: str = "",
         api_sync_url: str = "http://localhost:8000/api/v1/sync/batch",
+        api_token: Optional[str] = None,
         db_path: str = "counter_outbox.db",
         sync_interval_sec: float = 5.0,
         source: Optional[VideoSource] = None,
@@ -104,6 +105,7 @@ class CounterService:
         self.video_source_type = video_source_type.lower()
         self.video_path = video_path
         self.api_sync_url = api_sync_url
+        self.api_token = api_token
         self.db_path = db_path
         self.sync_interval_sec = sync_interval_sec
         self.target_fps = target_fps
@@ -149,6 +151,7 @@ class CounterService:
                 storage=self.storage,
                 api_url=self.api_sync_url,
                 line_id=self.line_id,
+                api_token=self.api_token,
             )
         else:
             self.dispatcher = None
@@ -838,6 +841,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="Central API endpoint for outbox sync",
     )
     parser.add_argument(
+        "--api-token",
+        "--api-key",
+        default=os.getenv("API_TOKEN") or os.getenv("API_KEY") or "",
+        help="API token or key for authenticating with central cloud API",
+    )
+    parser.add_argument(
         "--db-path",
         default=os.getenv("DB_PATH", "counter_outbox.db"),
         help="Path to local SQLite outbox database file",
@@ -907,6 +916,7 @@ def fetch_remote_line_config(
     api_sync_url: str,
     line_id: str,
     timeout: float = 3.0,
+    api_token: str | None = None,
 ) -> dict | None:
     """Fetches line configuration from central API on startup.
     Returns None if unreachable or on error (enabling offline fallback).
@@ -922,10 +932,22 @@ def fetch_remote_line_config(
             base_api = f"{api_sync_url.rstrip('/')}/api/v1"
 
         target_url = f"{base_api}/lines/{line_id}"
-        resp = httpx.get(target_url, timeout=timeout)
+        req_kwargs: dict[str, Any] = {"timeout": timeout}
+        if api_token and api_token.strip():
+            req_kwargs["headers"] = {"Authorization": f"Bearer {api_token.strip()}"}
+
+        resp = httpx.get(target_url, **req_kwargs)
         if resp.status_code == 200:
             return resp.json()
-        logger.warning("Remote line config returned HTTP %s for line %s", resp.status_code, line_id)
+        if resp.status_code == 401:
+            logger.warning(
+                "Remote line config returned HTTP 401 (Unauthorized) for line %s. "
+                "Check that API_TOKEN or API_KEY is set in your environment. "
+                "Falling back to local configuration.",
+                line_id,
+            )
+        else:
+            logger.warning("Remote line config returned HTTP %s for line %s", resp.status_code, line_id)
         return None
     except Exception as exc:
         logger.info("Could not fetch remote line config (%s). Using local parameters.", exc)
@@ -952,7 +974,8 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     # Remote config startup pull
     remote_config = None
     if enable_sync and args.api_sync_url:
-        remote_config = fetch_remote_line_config(args.api_sync_url, args.line_id)
+        logger.info("Attempting to fetch remote line configuration for %s from %s...", args.line_id, args.api_sync_url)
+        remote_config = fetch_remote_line_config(args.api_sync_url, args.line_id, api_token=args.api_token)
         if remote_config:
             if not args.video and remote_config.get("video_url"):
                 args.video = remote_config["video_url"]
@@ -1027,6 +1050,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         video_source_type=video_source_type,
         video_path=args.video,
         api_sync_url=args.api_sync_url,
+        api_token=args.api_token,
         db_path=args.db_path,
         sync_interval_sec=args.sync_interval,
         target_fps=args.target_fps,

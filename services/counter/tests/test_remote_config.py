@@ -221,4 +221,93 @@ def test_main_startup_direction_fallback_to_down_when_no_remote_config(monkeypat
         assert kwargs["line_direction"] == "down"
 
 
+def test_fetch_remote_config_with_api_token():
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "id": "line-1",
+        "video_url": "rtsp://camera1/stream",
+        "line_coords": "0,240,640,240",
+        "line_direction": "right",
+    }
+
+    with patch("httpx.get", return_value=mock_resp) as mock_get:
+        config = fetch_remote_line_config(
+            api_sync_url="http://central-api:8000/api/v1/sync/batch",
+            line_id="line-1",
+            api_token="cdc_live_test_token_123",
+        )
+        assert config is not None
+        assert config["video_url"] == "rtsp://camera1/stream"
+        mock_get.assert_called_once_with(
+            "http://central-api:8000/api/v1/lines/line-1",
+            timeout=3.0,
+            headers={"Authorization": "Bearer cdc_live_test_token_123"},
+        )
+
+
+def test_fetch_remote_config_401_logs_warning_and_returns_none(caplog):
+    import logging
+    mock_resp = MagicMock()
+    mock_resp.status_code = 401
+
+    with patch("httpx.get", return_value=mock_resp):
+        with caplog.at_level(logging.WARNING):
+            config = fetch_remote_line_config(
+                api_sync_url="http://central-api:8000/api/v1/sync/batch",
+                line_id="line-1",
+                api_token="invalid_token",
+            )
+            assert config is None
+            assert "HTTP 401 (Unauthorized)" in caplog.text
+            assert "API_TOKEN or API_KEY" in caplog.text
+
+
+def test_parse_args_api_token_cli():
+    from services.counter.main import parse_args
+    args = parse_args(["--api-token", "token-from-cli"])
+    assert args.api_token == "token-from-cli"
+
+    args2 = parse_args(["--api-key", "key-from-cli"])
+    assert args2.api_token == "key-from-cli"
+
+
+def test_parse_args_api_token_env(monkeypatch):
+    from services.counter.main import parse_args
+    monkeypatch.setenv("API_TOKEN", "token-from-env")
+    monkeypatch.delenv("API_KEY", raising=False)
+    args = parse_args([])
+    assert args.api_token == "token-from-env"
+
+
+def test_parse_args_api_key_env_fallback(monkeypatch):
+    from services.counter.main import parse_args
+    monkeypatch.delenv("API_TOKEN", raising=False)
+    monkeypatch.setenv("API_KEY", "key-from-env")
+    args = parse_args([])
+    assert args.api_token == "key-from-env"
+
+
+def test_main_startup_passes_api_token_to_remote_config_and_service(monkeypatch):
+    from services.counter.main import main
+
+    monkeypatch.setenv("LINE_ID", "line-1")
+    monkeypatch.setenv("API_SYNC_URL", "http://central:8000/api/v1/sync/batch")
+    monkeypatch.setenv("API_TOKEN", "test-token-456")
+
+    with patch("services.counter.main.fetch_remote_line_config", return_value={"id": "line-1"}) as mock_fetch, \
+         patch("services.counter.main.CounterService") as mock_service_cls:
+        mock_instance = MagicMock()
+        mock_service_cls.return_value = mock_instance
+
+        main([])
+
+        mock_fetch.assert_called_once_with(
+            "http://central:8000/api/v1/sync/batch",
+            "line-1",
+            api_token="test-token-456",
+        )
+        mock_service_cls.assert_called_once()
+        kwargs = mock_service_cls.call_args.kwargs
+        assert kwargs["api_token"] == "test-token-456"
 

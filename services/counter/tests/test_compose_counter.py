@@ -25,6 +25,7 @@ def test_counter_compose_structure():
     assert any("API_SYNC_URL" in k for k in env_keys)
     assert any("VIDEO_PATH" in k for k in env_keys)
     assert any("DB_PATH" in k for k in env_keys)
+    assert any("API_TOKEN" in k for k in env_keys)
 
     # Volume checks
     volumes = counter.get("volumes", [])
@@ -48,3 +49,4 @@ def test_env_counter_example_exists():
     assert "API_SYNC_URL=" in content
     assert "LINE_ID=" in content
     assert "VIDEO_PATH=" in content
+    assert "API_TOKEN=" in content
