@@ -13,7 +13,7 @@ export const apiKeysApi = {
       body: JSON.stringify(payload),
     }),
 
-  revokeApiKey: (keyId: string): Promise<ApiKeyItem> =>
+  revokeApiKey: (keyId: string | number): Promise<ApiKeyItem> =>
     http<ApiKeyItem>(`/api/v1/auth/api-keys/${keyId}`, {
       method: "DELETE",
     }),

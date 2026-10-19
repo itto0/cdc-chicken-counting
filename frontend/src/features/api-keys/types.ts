@@ -1,5 +1,5 @@
 export interface ApiKeyItem {
-  id: string;
+  id: string | number;
   name: string;
   prefix: string;
   role: "OPERATOR" | "ADMIN";
@@ -14,7 +14,7 @@ export interface CreateApiKeyPayload {
 }
 
 export interface CreateApiKeyResponse {
-  id: string;
+  id: string | number;
   name: string;
   api_key: string;
   prefix: string;
