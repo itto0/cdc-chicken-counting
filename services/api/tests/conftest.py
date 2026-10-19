@@ -10,7 +10,7 @@ def default_auth_override(request):
     while preserving real auth evaluation for dedicated auth and RBAC test suites.
     """
     node_id = request.node.nodeid
-    if any(auth_file in node_id for auth_file in ("test_auth_api", "test_rbac", "test_seed_users")):
+    if any(auth_file in node_id for auth_file in ("test_auth", "test_rbac", "test_seed_users", "test_e2e")):
         app.dependency_overrides.pop(get_current_user, None)
         yield
         app.dependency_overrides.pop(get_current_user, None)
