@@ -102,3 +102,25 @@ class User(Base):
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username='{self.username}', role='{self.role}', active={self.is_active})>"
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    prefix: Mapped[str] = mapped_column(String(16), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), default="OPERATOR")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)
+
+    def __init__(self, **kwargs) -> None:
+        kwargs.setdefault("role", "OPERATOR")
+        kwargs.setdefault("is_active", True)
+        super().__init__(**kwargs)
+
+    def __repr__(self) -> str:
+        return f"<ApiKey(id={self.id}, name='{self.name}', prefix='{self.prefix}', role='{self.role}', active={self.is_active})>"
+

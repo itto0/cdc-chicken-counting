@@ -42,3 +42,20 @@ def decode_access_token(token: str) -> Optional[dict]:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except Exception:
         return None
+
+
+def hash_api_key(raw_key: str) -> str:
+    """Return SHA-256 hex digest of a raw API key."""
+    return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+
+
+def generate_api_key() -> tuple[str, str, str]:
+    """Generate a high-entropy API key.
+    Returns: (raw_key, key_hash, prefix)
+    """
+    token_hex = secrets.token_hex(32)
+    raw_key = f"cdc_live_{token_hex}"
+    key_hash = hash_api_key(raw_key)
+    prefix = raw_key[:16]
+    return raw_key, key_hash, prefix
+

@@ -294,6 +294,7 @@ def test_metadata_tables_registered():
         "health_samples",
         "alarms",
         "users",
+        "api_keys",
     }
 
 
@@ -308,6 +309,7 @@ def test_init_db_helper(tmp_path):
         "health_samples",
         "alarms",
         "users",
+        "api_keys",
     }
     test_engine.dispose()
 
