@@ -355,7 +355,7 @@ docker run -d `
   --name cdc-counter `
   --restart unless-stopped `
   -v counter_data:/data `
-  -v "${PWD}\samples:/samples:ro" `
+  -v "${PWD}/samples:/samples:ro" `
   -e API_SYNC_URL="https://<cdc-api-subdomain>.onrender.com/api/v1/sync/batch" `
   -e LINE_ID="line-1" `
   -e VIDEO_PATH="/samples/Rekaman_2.MOV" `
@@ -507,18 +507,24 @@ docker logs -f cdc-counter
    ```
 
 2. **Verify via Central REST API**:
-   Query the conveyor line state:
+   Obtain an auth token and query the line summary:
    ```bash
-   curl -s https://<cdc-api-subdomain>.onrender.com/api/v1/lines/line-1 | jq .
+   TOKEN=$(curl -s -X POST https://<cdc-api-subdomain>.onrender.com/api/v1/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"username": "admin", "password": "<your-password>"}' | jq -r .access_token)
+
+   curl -s -H "Authorization: Bearer $TOKEN" \
+     https://<cdc-api-subdomain>.onrender.com/api/v1/lines/line-1/summary | jq .
    ```
-   Expected response indicates `stream_state: ONLINE` and updated count numbers:
+   Expected response indicates active telemetry and counts:
    ```json
    {
-     "id": "line-1",
-     "name": "Line 1 - Main Conveyor",
-     "stream_state": "ONLINE",
-     "today_count": 124,
-     "current_rate": 123.9
+     "line_id": "line-1",
+     "period": "today",
+     "total_count": 124,
+     "current_speed_cpm": 123.9,
+     "camera_status": "ONLINE",
+     "fps": 30.0
    }
    ```
 
@@ -580,7 +586,7 @@ To test that the local SQLite buffer functions properly during network outages:
 
 | Issue | Root Cause | Solution |
 | :--- | :--- | :--- |
-| **`FileNotFoundError: Video source not found`** | The video path specified by `VIDEO_PATH` does not exist inside the container. | Check that `SAMPLES_DIR` on the host contains the file and is mounted to `/samples:ro`. Ensure case sensitivity matches (`Rekaman_2.MOV` vs `rekaman_2.mov`). |
+| **Exits immediately with "Reached end of video stream" (Total Frames: 0)** | The video path specified by `VIDEO_PATH` does not exist inside the container. | Check that `SAMPLES_DIR` on the host contains the file and is mounted to `/samples:ro`. Ensure case sensitivity matches (`Rekaman_2.MOV` vs `rekaman_2.mov`). |
 | **`HTTP 404 / 422: Line not found`** | `LINE_ID` does not exist in central API database. | The default database seeds `line-1` and `lineA`. If using a custom line ID, create the line first in the central web dashboard or via `POST /api/v1/lines`. |
 | **OpenCV video decoding error** | Incompatible video container or proprietary video codec. | The container runs `opencv-python-headless` with standard FFmpeg decoders. Transcode the video to H.264 MP4: `ffmpeg -i input.mov -c:v libx264 -pix_fmt yuv420p samples/Rekaman_2.MOV`. |
 | **Render Cloud 502 / Spin-up Delay** | Free-tier Render instances spin down after inactivity (~50s cold start). | The edge counter's SQLite outbox and exponential backoff retry handle this automatically. No action needed; records flush as soon as the Render service wakes up. |

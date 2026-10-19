@@ -31,6 +31,10 @@ def test_counter_compose_structure():
     assert any("counter_data:/data" in v for v in volumes)
     assert any(":/samples:ro" in v for v in volumes)
 
+    # Security check: Zero inbound ports exposed
+    assert "ports" not in counter, "Edge counter must not expose any inbound ports"
+    assert "expose" not in counter, "Edge counter must not expose any inbound ports"
+
     # Named volume definition
     assert "volumes" in config and "counter_data" in config["volumes"]
 
