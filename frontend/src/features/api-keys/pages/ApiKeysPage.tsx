@@ -79,7 +79,7 @@ export function ApiKeysPage() {
           className="flex items-center gap-1.5 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>+ Buat Kunci Baru</span>
+          <span>Buat Kunci Baru</span>
         </Button>
       </PageHeader>
 
