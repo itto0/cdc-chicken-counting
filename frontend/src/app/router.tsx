@@ -1,7 +1,9 @@
 import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
+import { ProtectedRoute } from "@/features/auth";
 
+const LoginPage = lazy(() => import("@/features/auth/pages/LoginPage"));
 const DashboardPage = lazy(() => import("@/features/overview/pages/DashboardPage"));
 const LiniProduksiPage = lazy(() => import("@/features/livestream/pages/LiniProduksiPage"));
 const AlarmPage = lazy(() => import("@/features/alarms/pages/AlarmPage"));
@@ -36,8 +38,21 @@ function RouteErrorBoundary() {
 
 export const router = createBrowserRouter([
   {
+    path: "/login",
+    element: (
+      <Suspense fallback={<PageLoader />}>
+        <LoginPage />
+      </Suspense>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
     path: "/",
-    element: <AppShell />,
+    element: (
+      <ProtectedRoute>
+        <AppShell />
+      </ProtectedRoute>
+    ),
     errorElement: <RouteErrorBoundary />,
     children: [
       {
@@ -75,9 +90,11 @@ export const router = createBrowserRouter([
       {
         path: "pengaturan",
         element: (
-          <Suspense fallback={<PageLoader />}>
-            <PengaturanPage />
-          </Suspense>
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <Suspense fallback={<PageLoader />}>
+              <PengaturanPage />
+            </Suspense>
+          </ProtectedRoute>
         ),
       },
       {
