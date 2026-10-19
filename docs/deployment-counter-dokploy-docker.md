@@ -133,8 +133,8 @@ You can configure Compose via Git or Raw YAML:
     services:
       counter:
         build:
-          context: .
-          dockerfile: services/counter/Dockerfile
+          context: ./services/counter
+          dockerfile: Dockerfile
         container_name: cdc-counter
         restart: unless-stopped
         environment:
@@ -203,15 +203,17 @@ If you prefer using Dokploy's single **Application** service type instead of Com
 1. Under **Provider**, select **Git** and connect your repository (`cdc-chicken-counting`).
 2. Select your branch (`main`).
 3. Set **Build Type** to **Dockerfile**.
-4. Set **Dockerfile Path** to:
+4. Set **Context Path (Build Context)** to:
    ```
-   services/counter/Dockerfile
+   ./services/counter
    ```
-5. Set **Context Path (Build Context)** to:
+   *(or `.` if deploying directly from inside `services/counter/` or a separate counter repository)*
+5. Set **Dockerfile Path** to:
    ```
-   .
+   Dockerfile
    ```
-   > **CRITICAL**: The build context must be `.` (repository root). The counter Dockerfile requires copying `shared/` contracts in addition to `services/counter/`.
+   *(or `services/counter/Dockerfile` depending on whether your Dokploy version resolves the Dockerfile path relative to repository root or context path)*
+   > **STANDALONE BUILD CONTEXT**: The build context is `./services/counter` (or `.` when inside `services/counter/`). The counter service is completely self-contained and does not require repository root files or `shared/` contracts.
 
 #### Step 3: Configure Persistent Volumes
 1. Navigate to the **Volumes** tab.
@@ -320,7 +322,13 @@ For quick deployments without Docker Compose:
 ### Step 1: Build the Container Image
 From the root of the repository:
 ```bash
-docker build -t cdc-counter:latest -f services/counter/Dockerfile .
+docker build -t cdc-counter:latest ./services/counter
+```
+
+Alternatively, from inside the `services/counter` directory:
+```bash
+cd services/counter
+docker build -t cdc-counter:latest .
 ```
 
 ### Step 2: Create Named Data Volume
@@ -392,8 +400,8 @@ services:
   # ============================================================================
   counter-line1:
     build:
-      context: .
-      dockerfile: services/counter/Dockerfile
+      context: ./services/counter
+      dockerfile: Dockerfile
     container_name: cdc-counter-line1
     restart: unless-stopped
     environment:
@@ -415,8 +423,8 @@ services:
   # ============================================================================
   counter-lineA:
     build:
-      context: .
-      dockerfile: services/counter/Dockerfile
+      context: ./services/counter
+      dockerfile: Dockerfile
     container_name: cdc-counter-lineA
     restart: unless-stopped
     environment:
