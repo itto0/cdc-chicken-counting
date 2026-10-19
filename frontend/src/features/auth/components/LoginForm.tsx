@@ -72,6 +72,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             <input
               id="username"
               type="text"
+              autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="admin / operator"
@@ -96,6 +97,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             <input
               id="password"
               type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"

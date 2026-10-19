@@ -8,7 +8,8 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const destination = (location.state as { from?: { pathname?: string } })?.from?.pathname || "/";
+  const from = (location.state as { from?: { pathname?: string; search?: string } })?.from;
+  const destination = from ? `${from.pathname || "/"}${from.search || ""}` : "/";
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
