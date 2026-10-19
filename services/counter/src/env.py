@@ -16,3 +16,12 @@ def init_env(override: bool = False, dotenv_path: str | None = None) -> bool:
 
 
 __all__ = ["init_env"]
+
+# Ensure unified module identity across standalone and monorepo import paths
+import sys
+
+_self_module = sys.modules.get(__name__)
+if _self_module is not None:
+    for _alias in ("src.env", "services.counter.src.env"):
+        sys.modules.setdefault(_alias, _self_module)
+

@@ -4,12 +4,20 @@ from pydantic import BaseModel, Field
 
 
 try:
-    from services.counter.src.contracts import (
-        CountAggregateDTO,
-        CountEventDTO,
-        HealthSampleDTO,
-        SyncBatchPayload,
-    )
+    try:
+        from src.contracts import (
+            CountAggregateDTO,
+            CountEventDTO,
+            HealthSampleDTO,
+            SyncBatchPayload,
+        )
+    except ImportError:
+        from services.counter.src.contracts import (
+            CountAggregateDTO,
+            CountEventDTO,
+            HealthSampleDTO,
+            SyncBatchPayload,
+        )
 except ImportError:
     class CountEventDTO(BaseModel):
         track_id: int

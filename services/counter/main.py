@@ -11,25 +11,61 @@ import threading
 import time
 from typing import Optional, Sequence
 
-# Ensure project root is in sys.path when script is executed directly
-project_root = Path(__file__).resolve().parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
+# Ensure counter root and monorepo root are in sys.path when script is executed directly
+counter_root = Path(__file__).resolve().parent
+monorepo_root = counter_root.parent.parent
+for root_path in (counter_root, monorepo_root):
+    if root_path.exists() and str(root_path) not in sys.path:
+        sys.path.insert(0, str(root_path))
 
-from shared.env import init_env
+try:
+    from src.env import init_env
+except ImportError:
+    try:
+        from services.counter.src.env import init_env
+    except ImportError:
+        from shared.env import init_env
 
 init_env()
 
-from services.counter.src.capture.source import (
-    FileVideoSource,
-    SyntheticVideoSource,
-    VideoSource,
-)
-from services.counter.src.detection.detector import Detector, MockDetector, ShackleDetector
-from services.counter.src.storage.db import LocalStorage
-from services.counter.src.sync.dispatcher import OutboxSyncDispatcher
-from services.counter.src.tracking.tracker import ChickenCounter, VirtualLineZone
-from shared.contracts import CountAggregateDTO, HealthSampleDTO
+try:
+    from src.capture.source import (
+        FileVideoSource,
+        SyntheticVideoSource,
+        VideoSource,
+    )
+    from src.detection.detector import (
+        Detector,
+        MockDetector,
+        ONNXDetector,
+        ShackleDetector,
+    )
+    from src.storage.db import LocalStorage
+    from src.sync.dispatcher import OutboxSyncDispatcher
+    from src.tracking.tracker import ChickenCounter, VirtualLineZone
+except ImportError:
+    from services.counter.src.capture.source import (
+        FileVideoSource,
+        SyntheticVideoSource,
+        VideoSource,
+    )
+    from services.counter.src.detection.detector import (
+        Detector,
+        MockDetector,
+        ONNXDetector,
+        ShackleDetector,
+    )
+    from services.counter.src.storage.db import LocalStorage
+    from services.counter.src.sync.dispatcher import OutboxSyncDispatcher
+    from services.counter.src.tracking.tracker import ChickenCounter, VirtualLineZone
+
+try:
+    from src.contracts import CountAggregateDTO, HealthSampleDTO
+except ImportError:
+    try:
+        from services.counter.src.contracts import CountAggregateDTO, HealthSampleDTO
+    except ImportError:
+        from shared.contracts import CountAggregateDTO, HealthSampleDTO
 
 logger = logging.getLogger("counter.service")
 
@@ -953,7 +989,6 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     if chosen_detector == "onnx" or args.model:
         try:
-            from services.counter.src.detection.detector import ONNXDetector
             detector = ONNXDetector(model_path=args.model, conf_threshold=args.conf)
             logger.info("Initialized ONNXDetector with model: %s", args.model)
         except Exception as e:

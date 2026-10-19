@@ -7,14 +7,21 @@ import time
 from typing import Any
 import numpy as np
 
-# Ensure project root is in sys.path when script is executed directly
-project_root = Path(__file__).resolve().parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
+# Ensure counter root and monorepo root are in sys.path when script is executed directly
+counter_root = Path(__file__).resolve().parent
+monorepo_root = counter_root.parent.parent
+for root_path in (counter_root, monorepo_root):
+    if root_path.exists() and str(root_path) not in sys.path:
+        sys.path.insert(0, str(root_path))
 
-from services.counter.src.capture.source import SyntheticVideoSource
-from services.counter.src.detection.detector import MockDetector
-from services.counter.src.tracking.tracker import ChickenCounter, VirtualLineZone
+try:
+    from src.capture.source import SyntheticVideoSource
+    from src.detection.detector import MockDetector
+    from src.tracking.tracker import ChickenCounter, VirtualLineZone
+except ImportError:
+    from services.counter.src.capture.source import SyntheticVideoSource
+    from services.counter.src.detection.detector import MockDetector
+    from services.counter.src.tracking.tracker import ChickenCounter, VirtualLineZone
 
 
 def run_benchmark(num_frames: int = 300) -> dict[str, Any]:
