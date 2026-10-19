@@ -7,18 +7,25 @@ from shared.env import init_env
 
 init_env()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///api_central.db")
+def resolve_database_url(url: str | None = None) -> str:
+    raw_url = url or os.getenv("DATABASE_URL", "sqlite:///api_central.db")
+    # Render and legacy providers provide postgres:// which SQLAlchemy 2.0 rejects
+    if raw_url.startswith("postgres://"):
+        raw_url = "postgresql://" + raw_url[len("postgres://"):]
 
-# If PostgreSQL URL is provided without an explicit driver dialect, check for psycopg or psycopg2
-if DATABASE_URL.startswith("postgresql://"):
-    try:
-        import psycopg  # noqa: F401
-    except ImportError:
+    if raw_url.startswith("postgresql://") and "+psycopg" not in raw_url:
         try:
-            import psycopg2  # noqa: F401
-            DATABASE_URL = "postgresql+psycopg2://" + DATABASE_URL[len("postgresql://"):]
+            import psycopg  # noqa: F401
         except ImportError:
-            pass
+            try:
+                import psycopg2  # noqa: F401
+                raw_url = "postgresql+psycopg2://" + raw_url[len("postgresql://"):]
+            except ImportError:
+                pass
+    return raw_url
+
+
+DATABASE_URL = resolve_database_url()
 
 connect_args = {}
 engine_kwargs = {}
