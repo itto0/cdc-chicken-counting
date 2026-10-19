@@ -44,6 +44,13 @@ export async function http<T>(endpoint: string, options: RequestInit = {}): Prom
 
   const response = await fetch(url, { ...options, headers });
 
+  if (response.status === 401) {
+    // If request to /me or protected resource failed with 401, clear stale token
+    if (!endpoint.includes("/auth/login")) {
+      setAuthToken(null);
+    }
+  }
+
   if (!response.ok) {
     const errorText = await response.text();
     let parsedMessage = `HTTP error! status: ${response.status}`;
