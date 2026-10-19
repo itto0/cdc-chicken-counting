@@ -3,34 +3,11 @@ import { NavLink } from "react-router-dom";
 import { navigationConfig } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth";
+import ChickenLogo from "@/assets/logo/chicken_logo.png";
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-}
-
-// Chicken outline SVG logo as shown in client mockup
-function ChickenLogo({ className = "w-9 h-9" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 100 100"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {/* Sleek chicken outline path */}
-      <path d="M 35 25 C 38 18 45 15 50 18 C 55 21 52 28 50 32 C 65 32 80 42 82 58 C 84 72 72 85 55 85 C 38 85 24 72 25 55 C 26 42 32 35 38 28 Z" />
-      <path d="M 48 24 L 58 24" />
-      <circle cx="43" cy="24" r="2.5" fill="currentColor" stroke="none" />
-      <path d="M 28 56 C 35 52 45 54 52 62" />
-      <path d="M 38 85 L 34 94" />
-      <path d="M 50 85 L 50 94" />
-    </svg>
-  );
 }
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
@@ -72,7 +49,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         {/* Brand identity with chicken logo */}
         <div className="flex items-center h-20 px-6 border-b border-slate-100">
           <div className="flex items-center gap-3 text-slate-800">
-            <ChickenLogo className="w-10 h-10 text-slate-700" />
+            <img src={ChickenLogo} alt="" className="h-10 w-10" />
             <span className="sr-only">Lihat.id Poultry Counter</span>
           </div>
         </div>
