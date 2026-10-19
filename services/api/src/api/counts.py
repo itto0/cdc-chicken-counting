@@ -6,6 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from services.api.src.db.models import Line, CountEvent, CountAggregate
 from services.api.src.db.session import get_db
+from services.api.src.api.auth import get_current_user, UserDTO
 
 router = APIRouter(prefix="/api/v1/lines", tags=["counts"])
 
@@ -60,6 +61,7 @@ def get_line_counts(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(get_current_user),
 ):
     line = db.get(Line, line_id)
     if not line:

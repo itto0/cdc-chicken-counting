@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from services.api.src.db.models import Line, HealthSample, CountEvent
 from services.api.src.db.session import get_db
+from services.api.src.api.auth import get_current_user, require_role, UserDTO
 
 router = APIRouter(prefix="/api/v1/lines", tags=["lines"])
 
@@ -128,7 +129,11 @@ class LineDetailDTO(BaseModel):
 
 
 @router.post("", response_model=LineDetailDTO, status_code=status.HTTP_201_CREATED)
-def create_line(payload: LineCreatePayload, db: Session = Depends(get_db)):
+def create_line(
+    payload: LineCreatePayload,
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(require_role(["admin"])),
+):
     existing = db.get(Line, payload.id)
     if existing:
         raise HTTPException(
@@ -167,7 +172,10 @@ def create_line(payload: LineCreatePayload, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[LineStatusDTO])
-def list_lines(db: Session = Depends(get_db)):
+def list_lines(
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(get_current_user),
+):
     lines = db.scalars(select(Line)).all()
     now = datetime.now(timezone.utc)
     today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
@@ -217,7 +225,11 @@ def list_lines(db: Session = Depends(get_db)):
 
 
 @router.get("/{line_id}", response_model=LineDetailDTO)
-def get_line(line_id: str, db: Session = Depends(get_db)):
+def get_line(
+    line_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(get_current_user),
+):
     line = db.get(Line, line_id)
     if not line:
         raise HTTPException(status_code=404, detail="Line not found")
@@ -233,7 +245,12 @@ def get_line(line_id: str, db: Session = Depends(get_db)):
 
 
 @router.put("/{line_id}", response_model=LineDetailDTO)
-def update_line(line_id: str, payload: LineUpdatePayload, db: Session = Depends(get_db)):
+def update_line(
+    line_id: str,
+    payload: LineUpdatePayload,
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(require_role(["admin"])),
+):
     line = db.get(Line, line_id)
     if not line:
         raise HTTPException(status_code=404, detail="Line not found")
@@ -264,7 +281,11 @@ def update_line(line_id: str, payload: LineUpdatePayload, db: Session = Depends(
 
 
 @router.delete("/{line_id}", response_model=LineDetailDTO)
-def delete_line(line_id: str, db: Session = Depends(get_db)):
+def delete_line(
+    line_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(require_role(["admin"])),
+):
     line = db.get(Line, line_id)
     if not line:
         raise HTTPException(status_code=404, detail="Line not found")

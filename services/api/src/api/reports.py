@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from services.api.src.db.models import CountAggregate
 from services.api.src.db.session import get_db
+from services.api.src.api.auth import get_current_user, UserDTO
 from services.api.src.services.exporter import ExcelReportGenerator
 from services.api.src.services.pdf_exporter import PDFReportGenerator
 
@@ -33,6 +34,7 @@ def export_report(
     start_time: str | None = Query(default=None),
     end_time: str | None = Query(default=None),
     db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(get_current_user),
 ) -> Response:
     fmt = format.lower()
     if fmt not in ("xlsx", "pdf"):

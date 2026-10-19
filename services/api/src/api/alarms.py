@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from services.api.src.db.models import Alarm
 from services.api.src.db.session import get_db
+from services.api.src.api.auth import get_current_user, UserDTO
 
 router = APIRouter(prefix="/api/v1/alarms", tags=["alarms"])
 
@@ -44,6 +45,7 @@ def list_alarms(
     status: Optional[str] = Query(None),
     severity: Optional[str] = Query(None),
     db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(get_current_user),
 ):
     query = select(Alarm)
     if line_id:
@@ -81,6 +83,7 @@ def patch_alarm(
     alarm_id: int,
     payload: AlarmPatchPayload,
     db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(get_current_user),
 ):
     alarm = db.get(Alarm, alarm_id)
     if not alarm:

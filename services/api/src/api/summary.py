@@ -6,6 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from services.api.src.db.models import Line, HealthSample, CountEvent, Alarm
 from services.api.src.db.session import get_db
+from services.api.src.api.auth import get_current_user, UserDTO
 
 router = APIRouter(prefix="/api/v1/lines", tags=["summary"])
 
@@ -31,6 +32,7 @@ def get_line_summary(
     line_id: str,
     period: str = Query(default="today", pattern="^(today|shift|week)$"),
     db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(get_current_user),
 ):
     line = db.get(Line, line_id)
     if not line:
