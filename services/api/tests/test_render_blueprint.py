@@ -46,3 +46,11 @@ def test_render_blueprint_structure():
         r.get("type") == "rewrite" and r.get("source") == "/*" and r.get("destination") == "/index.html"
         for r in routes
     ), "Static site must include SPA rewrite rule /* -> /index.html"
+
+    # Dynamic API Base URL wiring from cdc-api
+    frontend_env = frontend_service.get("envVars", [])
+    vite_env = next((e for e in frontend_env if e.get("key") == "VITE_API_BASE_URL"), None)
+    assert vite_env is not None, "VITE_API_BASE_URL must be defined on cdc-frontend"
+    assert "fromService" in vite_env, "VITE_API_BASE_URL must be dynamically derived from cdc-api"
+    assert vite_env["fromService"]["name"] == "cdc-api"
+    assert vite_env["fromService"]["envVarKey"] == "RENDER_EXTERNAL_URL"

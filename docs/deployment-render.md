@@ -102,17 +102,14 @@ Render will automatically parse `render.yaml` and display the resources to be cr
 * **Web Service**: `cdc-api` (Docker runtime, build context `.`)
 * **Static Site**: `cdc-frontend` (Static runtime, root `frontend`, build command `npm ci && npm run build`)
 
-### Step 5: Configure `VITE_API_BASE_URL`
-During blueprint setup, Render will prompt for the static site's environment variable:
-* **`VITE_API_BASE_URL`**:
-  * Set this to `https://<cdc-api-subdomain>.onrender.com` (for example: `https://cdc-api.onrender.com` or your designated backend subdomain).
-  * *Note*: If you do not know your exact subdomain yet, enter a placeholder (e.g. `https://cdc-api.onrender.com`). Once `cdc-api` finishes deploying and reveals its URL, update `VITE_API_BASE_URL` in `cdc-frontend` > **Environment** and trigger **Manual Deploy > Deploy latest commit** (see [Important Vite Note](#important-vite-build-time-environment-note)).
+### Step 5: Automatic API URL Wiring
+`render.yaml` automatically wires `VITE_API_BASE_URL` directly from `cdc-api`'s assigned `RENDER_EXTERNAL_URL` using `fromService`. You do not need to manually guess or type the backend URL.
 
 ### Step 6: Apply and Deploy
 Click **Apply**. Render will concurrently:
 1. Provision the managed PostgreSQL database.
 2. Build and launch the Docker container for `cdc-api`, generating a secure `JWT_SECRET_KEY` and linking `DATABASE_URL`.
-3. Install dependencies and compile the React frontend, then distribute the static assets to the global CDN.
+3. Compile the React frontend using `cdc-api`'s live URL and distribute static assets to the global CDN.
 
 ---
 
