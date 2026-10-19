@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { X, Copy, Check, AlertTriangle, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,28 +21,44 @@ export function CreateApiKeyModal({ isOpen, onClose, onSubmit }: CreateApiKeyMod
   const [createdResult, setCreatedResult] = useState<CreateApiKeyResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetAllState = () => {
+    setName("");
+    setRole("OPERATOR");
+    setIsSubmitting(false);
+    setErrorMsg(null);
+    setCreatedResult(null);
+    setCopied(false);
+  };
+
   useEffect(() => {
     if (isOpen) {
-      setName("");
-      setRole("OPERATOR");
-      setIsSubmitting(false);
-      setErrorMsg(null);
+      resetAllState();
+    } else {
       setCreatedResult(null);
-      setCopied(false);
     }
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
   }, [isOpen]);
+
+  const handleClose = () => {
+    resetAllState();
+    onClose();
+  };
 
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       // Allow escape only on stage 1 to prevent losing uncopied key on stage 2
       if (e.key === "Escape" && !isSubmitting && !createdResult) {
-        onClose();
+        handleClose();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, isSubmitting, createdResult, onClose]);
+  }, [isOpen, isSubmitting, createdResult]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -64,21 +80,33 @@ export function CreateApiKeyModal({ isOpen, onClose, onSubmit }: CreateApiKeyMod
     }
   };
 
+  const copyWithFallback = (text: string) => {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "absolute";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+  };
+
   const handleCopy = async () => {
     if (!createdResult?.api_key) return;
     try {
       if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(createdResult.api_key);
+        try {
+          await navigator.clipboard.writeText(createdResult.api_key);
+        } catch {
+          copyWithFallback(createdResult.api_key);
+        }
       } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = createdResult.api_key;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
+        copyWithFallback(createdResult.api_key);
       }
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2500);
     } catch {
       setErrorMsg("Gagal menyalin ke clipboard");
     }
@@ -94,7 +122,7 @@ export function CreateApiKeyModal({ isOpen, onClose, onSubmit }: CreateApiKeyMod
       aria-labelledby="create-api-key-modal-title"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting && !createdResult) {
-          onClose();
+          handleClose();
         }
       }}
     >
@@ -118,7 +146,7 @@ export function CreateApiKeyModal({ isOpen, onClose, onSubmit }: CreateApiKeyMod
           {!createdResult && (
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isSubmitting}
               aria-label="Tutup"
               className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition-colors disabled:opacity-50 cursor-pointer"
@@ -173,7 +201,7 @@ export function CreateApiKeyModal({ isOpen, onClose, onSubmit }: CreateApiKeyMod
             </div>
 
             <div className="flex items-center justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
-              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting}>
                 Batal
               </Button>
               <Button type="submit" disabled={isSubmitting}>
@@ -246,7 +274,7 @@ export function CreateApiKeyModal({ isOpen, onClose, onSubmit }: CreateApiKeyMod
             </div>
 
             <div className="pt-2">
-              <Button type="button" onClick={onClose} className="w-full">
+              <Button type="button" onClick={handleClose} className="w-full">
                 Selesai &amp; Tutup
               </Button>
             </div>
