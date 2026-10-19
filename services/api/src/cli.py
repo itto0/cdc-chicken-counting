@@ -1,12 +1,7 @@
 import argparse
 from services.api.src.db.models import ApiKey
 from services.api.src.db.session import SessionLocal
-
-try:
-    from services.api.src.db.session import init_db
-except ImportError:
-    from services.api.src.main import init_db
-
+from services.api.src.main import init_db
 from services.api.src.services.auth import generate_api_key
 
 

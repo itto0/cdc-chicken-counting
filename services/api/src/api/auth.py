@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import Callable, Optional
+from typing import Callable, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Header
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from services.api.src.db.models import User, ApiKey
@@ -36,8 +36,21 @@ class LoginResponse(BaseModel):
 
 
 class ApiKeyCreateRequest(BaseModel):
-    name: str
-    role: str = "OPERATOR"
+    name: str = Field(..., min_length=1, max_length=100)
+    role: Literal["OPERATOR", "ADMIN"] = "OPERATOR"
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("name cannot be blank")
+        return v
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, v: str) -> str:
+        return v.strip().upper() if isinstance(v, str) else v
 
 
 class ApiKeyCreateResponse(BaseModel):
@@ -95,14 +108,18 @@ def get_current_user(
         key = db.scalars(select(ApiKey).where(ApiKey.key_hash == key_hash)).first()
         if not key or not key.is_active:
             raise HTTPException(status_code=401, detail="Invalid or revoked API key")
-        key.last_used_at = datetime.now(timezone.utc)
-        db.commit()
-        return UserDTO(
+        user_dto = UserDTO(
             id=key.id,
             username=f"device:{key.name}",
             role=key.role,
             is_active=key.is_active,
         )
+        try:
+            key.last_used_at = datetime.now(timezone.utc)
+            db.commit()
+        except Exception:
+            db.rollback()
+        return user_dto
 
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")

@@ -234,3 +234,33 @@ def test_empty_or_whitespace_x_api_key(api_client):
     assert resp.status_code == 401
     assert resp.json()["detail"] == "Invalid or revoked API key"
 
+
+def test_api_key_create_validation(api_client):
+    admin_token = create_access_token({"sub": "admin", "role": "admin"})
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    # Blank name rejected
+    resp_blank = api_client.post(
+        "/api/v1/auth/api-keys",
+        json={"name": "   ", "role": "OPERATOR"},
+        headers=admin_headers,
+    )
+    assert resp_blank.status_code == 422
+
+    # Invalid role rejected
+    resp_invalid_role = api_client.post(
+        "/api/v1/auth/api-keys",
+        json={"name": "Valid Name", "role": "INVALID_ROLE"},
+        headers=admin_headers,
+    )
+    assert resp_invalid_role.status_code == 422
+
+    # Case-insensitive role normalized to uppercase
+    resp_lower_role = api_client.post(
+        "/api/v1/auth/api-keys",
+        json={"name": "Valid Name", "role": "operator"},
+        headers=admin_headers,
+    )
+    assert resp_lower_role.status_code == 201
+    assert resp_lower_role.json()["role"] == "OPERATOR"
+
