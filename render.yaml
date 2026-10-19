@@ -3,7 +3,7 @@ databases:
     databaseName: chicken_counting
     user: postgres
     plan: free
-    region: oregon
+    region: indonesia
 
 services:
   - type: web
@@ -12,7 +12,7 @@ services:
     dockerfilePath: ./services/api/Dockerfile
     dockerContext: .
     plan: free
-    region: oregon
+    region: indonesia
     healthCheckPath: /healthz
     envVars:
       - key: DATABASE_URL
@@ -33,7 +33,7 @@ services:
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     plan: free
-    region: oregon
+    region: indonesia
     routes:
       - type: rewrite
         source: /*
