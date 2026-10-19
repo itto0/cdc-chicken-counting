@@ -1,0 +1,43 @@
+databases:
+  - name: cdc-postgres
+    databaseName: chicken_counting
+    user: postgres
+    plan: free
+    region: oregon
+
+services:
+  - type: web
+    name: cdc-api
+    runtime: docker
+    dockerfilePath: ./services/api/Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cdc-postgres
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: API_SYNC_BATCH_MAX
+        value: "1000"
+      - key: CORS_ORIGINS
+        value: "*"
+
+  - type: web
+    name: cdc-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    plan: free
+    region: oregon
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
