@@ -74,9 +74,9 @@ export function Header({ onOpenSidebar }: HeaderProps) {
         </Link>
 
         {/* Dynamic User Profile Badge */}
-        <div className="flex items-center gap-2 bg-slate-900 text-white pl-3.5 pr-1.5 py-1.5 rounded-full text-xs font-medium shadow-sm">
+        <div className="flex items-center gap-2 bg-slate-300 pl-3.5 pr-1.5 py-1.5 rounded-full text-xs font-medium shadow-sm">
           <div className="flex flex-col items-start leading-none pr-1">
-            <span className="font-semibold text-slate-100">{user?.username || "Pengguna"}</span>
+            <span className="font-semibold">{user?.username || "Pengguna"}</span>
             <span className={`text-[10px] font-bold uppercase mt-0.5 ${isAdmin ? "text-indigo-400" : "text-emerald-400"}`}>
               {user?.role || "Operator"}
             </span>
