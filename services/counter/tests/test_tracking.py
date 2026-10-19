@@ -80,6 +80,7 @@ def test_tracker_records_bbox_on_creation_and_update():
     counter.update([det2], timestamp=100.033)
     track = counter.tracks[1]
     assert track.bbox == (102.0, 150.0, 142.0, 190.0)
+    assert track.class_name == "chicken"
     assert track.confidence == 0.93
     assert track.counted is False
 

@@ -297,6 +297,7 @@ def test_main_argv_shackle_detector_options(tmp_path):
 
 def test_render_window_frame_bounding_box_colors(tmp_path):
     """Verify _render_window_frame colors uncounted tracks orange and counted tracks green."""
+    import cv2
     import numpy as np
     from unittest.mock import patch
     from services.counter.src.detection.detector import Detection
@@ -335,7 +336,7 @@ def test_render_window_frame_bounding_box_colors(tmp_path):
 
     dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
 
-    with patch("cv2.imshow"), patch("cv2.namedWindow"), patch("cv2.resizeWindow"), patch("cv2.waitKey"):
+    with patch("cv2.imshow"), patch("cv2.namedWindow"), patch("cv2.resizeWindow"), patch("cv2.waitKey"), patch("cv2.putText", wraps=cv2.putText) as mock_put_text:
         vis = service._render_window_frame(dummy_frame, detections=[], events=[])
 
     assert vis is not None
@@ -344,6 +345,18 @@ def test_render_window_frame_bounding_box_colors(tmp_path):
     assert tuple(vis[50, 100]) == (0, 180, 255)
     # Track 2 border at (x=250, y=250) should be Green (BGR: 0, 220, 0)
     assert tuple(vis[250, 300]) == (0, 220, 0)
+
+    # Verify track labels: Track 2 (counted) includes [COUNTED], Track 1 (uncounted) does not
+    rendered_labels = [call.args[1] for call in mock_put_text.call_args_list]
+    track1_labels = [l for l in rendered_labels if "#1" in l]
+    assert len(track1_labels) == 1
+    assert track1_labels[0] == "chicken #1 0.91"
+    assert "[COUNTED]" not in track1_labels[0]
+
+    track2_labels = [l for l in rendered_labels if "#2" in l]
+    assert len(track2_labels) == 1
+    assert track2_labels[0] == "chicken #2 0.95 [COUNTED]"
+    assert "[COUNTED]" in track2_labels[0]
 
 
 def test_render_window_frame_stale_tracks_and_unmatched_detections(tmp_path):
