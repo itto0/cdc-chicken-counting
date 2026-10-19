@@ -1,14 +1,17 @@
+from datetime import datetime, timezone
 from typing import Callable, Optional
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from services.api.src.db.models import User
+from services.api.src.db.models import User, ApiKey
 from services.api.src.db.session import get_db
 from services.api.src.services.auth import (
     verify_password,
     create_access_token,
     decode_access_token,
+    hash_api_key,
+    generate_api_key,
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -32,6 +35,30 @@ class LoginResponse(BaseModel):
     user: UserDTO
 
 
+class ApiKeyCreateRequest(BaseModel):
+    name: str
+    role: str = "OPERATOR"
+
+
+class ApiKeyCreateResponse(BaseModel):
+    id: int
+    name: str
+    api_key: str
+    prefix: str
+    role: str
+    created_at: datetime
+
+
+class ApiKeyResponse(BaseModel):
+    id: int
+    name: str
+    prefix: str
+    role: str
+    is_active: bool
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+
+
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.scalars(select(User).where(User.username == payload.username)).first()
@@ -48,7 +75,35 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserDTO)
-def get_current_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+def get_current_user(
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    db: Session = Depends(get_db),
+):
+    raw_key: Optional[str] = None
+    if x_api_key is not None:
+        if not x_api_key.strip():
+            raise HTTPException(status_code=401, detail="Invalid or revoked API key")
+        raw_key = x_api_key.strip()
+    elif authorization and authorization.startswith("Bearer "):
+        parts = authorization.split(" ", 1)
+        if len(parts) == 2 and parts[1].strip().startswith("cdc_live_"):
+            raw_key = parts[1].strip()
+
+    if raw_key is not None:
+        key_hash = hash_api_key(raw_key)
+        key = db.scalars(select(ApiKey).where(ApiKey.key_hash == key_hash)).first()
+        if not key or not key.is_active:
+            raise HTTPException(status_code=401, detail="Invalid or revoked API key")
+        key.last_used_at = datetime.now(timezone.utc)
+        db.commit()
+        return UserDTO(
+            id=key.id,
+            username=f"device:{key.name}",
+            role=key.role,
+            is_active=key.is_active,
+        )
+
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
 
@@ -82,4 +137,73 @@ def require_role(allowed_roles: list[str]) -> Callable[..., UserDTO]:
         return current_user
 
     return role_checker
+
+
+@router.post("/api-keys", response_model=ApiKeyCreateResponse, status_code=201)
+def create_api_key_endpoint(
+    payload: ApiKeyCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(require_role(["admin"])),
+):
+    raw_key, key_hash, prefix = generate_api_key()
+    api_key_obj = ApiKey(
+        name=payload.name,
+        key_hash=key_hash,
+        prefix=prefix,
+        role=payload.role,
+    )
+    db.add(api_key_obj)
+    db.commit()
+    db.refresh(api_key_obj)
+    return ApiKeyCreateResponse(
+        id=api_key_obj.id,
+        name=api_key_obj.name,
+        api_key=raw_key,
+        prefix=api_key_obj.prefix,
+        role=api_key_obj.role,
+        created_at=api_key_obj.created_at,
+    )
+
+
+@router.get("/api-keys", response_model=list[ApiKeyResponse])
+def list_api_keys(
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(require_role(["admin"])),
+):
+    keys = db.scalars(select(ApiKey).order_by(ApiKey.id)).all()
+    return [
+        ApiKeyResponse(
+            id=k.id,
+            name=k.name,
+            prefix=k.prefix,
+            role=k.role,
+            is_active=k.is_active,
+            created_at=k.created_at,
+            last_used_at=k.last_used_at,
+        )
+        for k in keys
+    ]
+
+
+@router.delete("/api-keys/{key_id}", response_model=ApiKeyResponse)
+def revoke_api_key(
+    key_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(require_role(["admin"])),
+):
+    key = db.get(ApiKey, key_id)
+    if not key:
+        raise HTTPException(status_code=404, detail="API key not found")
+    key.is_active = False
+    db.commit()
+    db.refresh(key)
+    return ApiKeyResponse(
+        id=key.id,
+        name=key.name,
+        prefix=key.prefix,
+        role=key.role,
+        is_active=key.is_active,
+        created_at=key.created_at,
+        last_used_at=key.last_used_at,
+    )
 
