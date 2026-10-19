@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Callable, Optional
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -68,3 +68,18 @@ def get_current_user(authorization: Optional[str] = Header(None), db: Session = 
         raise HTTPException(status_code=403, detail="User account is inactive")
 
     return UserDTO(id=user.id, username=user.username, role=user.role, is_active=user.is_active)
+
+
+def require_role(allowed_roles: list[str]) -> Callable[..., UserDTO]:
+    def role_checker(current_user: UserDTO = Depends(get_current_user)) -> UserDTO:
+        user_role = (current_user.role or "").strip().lower()
+        normalized_allowed = [r.strip().lower() for r in allowed_roles]
+        if user_role not in normalized_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Operation not permitted. Required role: {', '.join(allowed_roles)}",
+            )
+        return current_user
+
+    return role_checker
+
