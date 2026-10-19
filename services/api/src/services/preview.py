@@ -124,8 +124,11 @@ class FrameGenerator:
                         line_active = True
                         box_color = (0, 255, 0)
                         label = "COUNTING (90%)"
+                    elif rcx > mid_x + 18:
+                        box_color = (0, 220, 0)
+                        label = "Ayam [COUNTED] (90%)"
                     else:
-                        box_color = (0, 200, 255)
+                        box_color = (0, 180, 255)
                         label = "Ayam (90%)"
 
                     cv2.rectangle(resized, (rx1, ry1), (rx2, ry2), box_color, 2)
@@ -192,8 +195,19 @@ class FrameGenerator:
 
         # Animated shackle / chicken moving across
         x_pos = int((safe_frame_num * 15) % 500 + 70)
-        cv2.rectangle(img, (x_pos - 30, 190), (x_pos + 30, 310), (0, 180, 255), 2)
-        cv2.putText(img, f"Chicken #{(safe_frame_num // 33) + 1} (98%)", (x_pos - 35, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 180, 255), 1)
+        mid_x = 320
+        if abs(x_pos - mid_x) <= 20:
+            box_color = (0, 255, 0)
+            label = f"Chicken #{(safe_frame_num // 33) + 1} COUNTING (98%)"
+        elif x_pos > mid_x + 20:
+            box_color = (0, 220, 0)
+            label = f"Chicken #{(safe_frame_num // 33) + 1} [COUNTED] (98%)"
+        else:
+            box_color = (0, 180, 255)
+            label = f"Chicken #{(safe_frame_num // 33) + 1} (98%)"
+
+        cv2.rectangle(img, (x_pos - 30, 190), (x_pos + 30, 310), box_color, 2)
+        cv2.putText(img, label, (x_pos - 35, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.4, box_color, 1)
 
         # HUD overlay
         ts_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
