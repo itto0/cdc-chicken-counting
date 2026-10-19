@@ -166,9 +166,13 @@ def test_standalone_import_when_counter_dir_is_cwd(monkeypatch):
     if str(COUNTER_DIR) not in sys.path:
         monkeypatch.syspath_prepend(str(COUNTER_DIR))
 
-    import main
-    import benchmark
+    try:
+        import main
+        import benchmark
 
-    assert hasattr(main, "CounterService")
-    assert hasattr(main, "parse_args")
-    assert hasattr(benchmark, "run_benchmark")
+        assert hasattr(main, "CounterService")
+        assert hasattr(main, "parse_args")
+        assert hasattr(benchmark, "run_benchmark")
+    finally:
+        sys.modules.pop("main", None)
+        sys.modules.pop("benchmark", None)

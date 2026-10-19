@@ -12,11 +12,15 @@ import time
 from typing import Optional, Sequence
 
 # Ensure counter root and monorepo root are in sys.path when script is executed directly
+# Add counter root to sys.path, and add monorepo root only if running inside monorepo
 counter_root = Path(__file__).resolve().parent
 monorepo_root = counter_root.parent.parent
-for root_path in (counter_root, monorepo_root):
-    if root_path.exists() and str(root_path) not in sys.path:
-        sys.path.insert(0, str(root_path))
+
+if str(counter_root) not in sys.path:
+    sys.path.insert(0, str(counter_root))
+
+if (monorepo_root / "services").is_dir() and str(monorepo_root) not in sys.path:
+    sys.path.append(str(monorepo_root))
 
 try:
     from src.env import init_env
