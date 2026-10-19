@@ -12,6 +12,7 @@ import type {
   UserDTO,
 } from "../types";
 import { getAuthToken, setAuthToken } from "@/lib/http";
+import { API_BASE_URL } from "@/config/env";
 
 export { getAuthToken, setAuthToken };
 
@@ -19,17 +20,7 @@ export { getAuthToken, setAuthToken };
  * Resolve base API URL from environment or default to local dev backend.
  */
 export function getBaseUrl(): string {
-  if (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL !== undefined) {
-    return import.meta.env.VITE_API_BASE_URL;
-  }
-  const globalProcess =
-    typeof globalThis !== "undefined"
-      ? (globalThis as unknown as { process?: { env?: Record<string, string> } }).process
-      : undefined;
-  if (globalProcess?.env?.VITE_API_BASE_URL !== undefined) {
-    return globalProcess.env.VITE_API_BASE_URL;
-  }
-  return "";
+  return API_BASE_URL;
 }
 
 /**
