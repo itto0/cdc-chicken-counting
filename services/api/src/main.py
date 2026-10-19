@@ -15,8 +15,9 @@ from services.api.src.api.live import router as live_router
 from services.api.src.api.reports import router as reports_router
 from services.api.src.api.summary import router as summary_router
 from services.api.src.api.sync import router as sync_router
-from services.api.src.db.models import Base, Line
+from services.api.src.db.models import Base, Line, User
 from services.api.src.db.session import engine
+from services.api.src.services.auth import hash_password
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -47,6 +48,28 @@ def init_db(target_engine=None) -> None:
                     is_active=True,
                 )
             )
+
+        admin_user = session.execute(select(User).where(User.username == "admin")).scalar_one_or_none()
+        if not admin_user:
+            session.add(
+                User(
+                    username="admin",
+                    password_hash=hash_password("admin123"),
+                    role="admin",
+                    is_active=True,
+                )
+            )
+        operator_user = session.execute(select(User).where(User.username == "operator")).scalar_one_or_none()
+        if not operator_user:
+            session.add(
+                User(
+                    username="operator",
+                    password_hash=hash_password("operator123"),
+                    role="operator",
+                    is_active=True,
+                )
+            )
+
         session.commit()
 
 
