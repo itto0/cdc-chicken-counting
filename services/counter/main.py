@@ -9,7 +9,7 @@ import signal
 import sys
 import threading
 import time
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 # Ensure counter root and monorepo root are in sys.path when script is executed directly
 # Add counter root to sys.path, and add monorepo root only if running inside monorepo
