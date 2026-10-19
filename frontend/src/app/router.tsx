@@ -9,6 +9,7 @@ const LiniProduksiPage = lazy(() => import("@/features/livestream/pages/LiniProd
 const AlarmPage = lazy(() => import("@/features/alarms/pages/AlarmPage"));
 const LaporanPage = lazy(() => import("@/features/reports/pages/LaporanPage"));
 const PengaturanPage = lazy(() => import("@/features/settings/pages/PengaturanPage"));
+const ApiKeysPage = lazy(() => import("@/features/api-keys/pages/ApiKeysPage"));
 
 const PageLoader = () => (
   <div
@@ -93,6 +94,16 @@ export const router = createBrowserRouter([
           <ProtectedRoute allowedRoles={["admin"]}>
             <Suspense fallback={<PageLoader />}>
               <PengaturanPage />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "api-keys",
+        element: (
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <Suspense fallback={<PageLoader />}>
+              <ApiKeysPage />
             </Suspense>
           </ProtectedRoute>
         ),
