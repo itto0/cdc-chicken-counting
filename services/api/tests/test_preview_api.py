@@ -97,3 +97,36 @@ async def test_mjpeg_preview_uses_asyncio_to_thread(monkeypatch):
         pass
     assert len(called_in_thread) >= 1
     assert called_in_thread[0][0] == FrameGenerator.generate_jpeg_frame
+
+
+def test_synthetic_preview_frame_bounding_box_colors():
+    """Verify synthetic preview frame generates orange, bright green, and counted green boxes."""
+    # Frame 0: x_pos = (0 * 15) % 500 + 70 = 70 (< 300: Approaching/Uncounted)
+    frame_uncounted_bytes = FrameGenerator.generate_jpeg_frame("test-line", 0)
+    arr0 = np.frombuffer(frame_uncounted_bytes, dtype=np.uint8)
+    img0 = cv2.imdecode(arr0, cv2.IMREAD_COLOR)
+    # Box rectangle at x_pos=70 is from x=40 to x=100, y=190 to y=310.
+    # BGR color for uncounted is (0, 180, 255) (Orange)
+    # Check top horizontal border of the box at (y=190, x=70)
+    assert img0[190, 70][0] < 50  # Blue channel low
+    assert img0[190, 70][1] > 140  # Green channel ~180
+    assert img0[190, 70][2] > 200  # Red channel ~255
+
+    # Frame 17: x_pos = (17 * 15) % 500 + 70 = 325 (Crossing virtual line at 320)
+    frame_crossing_bytes = FrameGenerator.generate_jpeg_frame("test-line", 17)
+    arr17 = np.frombuffer(frame_crossing_bytes, dtype=np.uint8)
+    img17 = cv2.imdecode(arr17, cv2.IMREAD_COLOR)
+    # BGR color for crossing is (0, 255, 0) (Bright green)
+    assert img17[190, 325][0] < 50  # Blue channel low
+    assert img17[190, 325][1] > 220  # Green channel high
+    assert img17[190, 325][2] < 50  # Red channel low
+
+    # Frame 21: x_pos = (21 * 15) % 500 + 70 = 385 (> 340: Counted)
+    frame_counted_bytes = FrameGenerator.generate_jpeg_frame("test-line", 21)
+    arr21 = np.frombuffer(frame_counted_bytes, dtype=np.uint8)
+    img21 = cv2.imdecode(arr21, cv2.IMREAD_COLOR)
+    # BGR color for counted is (0, 220, 0) (Green)
+    assert img21[190, 385][0] < 50  # Blue channel low
+    assert img21[190, 385][1] > 180  # Green channel ~220
+    assert img21[190, 385][2] < 50  # Red channel low
+
