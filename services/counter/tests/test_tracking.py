@@ -21,9 +21,67 @@ def test_tracked_object_dataclass_fields():
     assert obj.track_id == 1
     assert obj.last_anchor == (100.0, 150.0)
     assert obj.current_anchor == (100.0, 160.0)
+    assert obj.bbox == (0.0, 0.0, 0.0, 0.0)
+    assert obj.class_name == "chicken"
+    assert obj.confidence == 0.0
     assert obj.missed_frames == 0
     assert obj.age == 0
     assert obj.counted is False
+
+
+def test_tracked_object_bbox_and_metadata_fields():
+    """Verify TrackedObject dataclass holds bbox, class_name, and confidence."""
+    obj = TrackedObject(
+        track_id=1,
+        last_anchor=(100.0, 150.0),
+        current_anchor=(100.0, 160.0),
+        bbox=(80.0, 120.0, 120.0, 160.0),
+        class_name="chicken",
+        confidence=0.92,
+    )
+    assert obj.bbox == (80.0, 120.0, 120.0, 160.0)
+    assert obj.class_name == "chicken"
+    assert obj.confidence == 0.92
+
+
+def test_tracker_records_bbox_on_creation_and_update():
+    """Verify ChickenCounter.update records bbox, class_name, and confidence on new tracks and matches."""
+    line_zone = VirtualLineZone(start=(0, 200), end=(640, 200), direction="down")
+    counter = ChickenCounter(line_zone=line_zone)
+
+    # Frame 1: Detection creates new track
+    det1 = Detection(
+        x1=100.0,
+        y1=120.0,
+        x2=140.0,
+        y2=160.0,
+        confidence=0.88,
+        class_id=0,
+        class_name="chicken",
+    )
+    counter.update([det1], timestamp=100.0)
+    assert len(counter.tracks) == 1
+    track = counter.tracks[1]
+    assert track.bbox == (100.0, 120.0, 140.0, 160.0)
+    assert track.class_name == "chicken"
+    assert track.confidence == 0.88
+    assert track.counted is False
+
+    # Frame 2: Detection moves and matches track
+    det2 = Detection(
+        x1=102.0,
+        y1=150.0,
+        x2=142.0,
+        y2=190.0,
+        confidence=0.93,
+        class_id=0,
+        class_name="chicken",
+    )
+    counter.update([det2], timestamp=100.033)
+    track = counter.tracks[1]
+    assert track.bbox == (102.0, 150.0, 142.0, 190.0)
+    assert track.confidence == 0.93
+    assert track.counted is False
 
 
 def test_line_crossing_increments_count_once():

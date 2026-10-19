@@ -16,6 +16,9 @@ class TrackedObject:
     track_id: int
     last_anchor: tuple[float, float]
     current_anchor: tuple[float, float]
+    bbox: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
+    class_name: str = "chicken"
+    confidence: float = 0.0
     missed_frames: int = 0
     age: int = 0
     counted: bool = False
@@ -173,6 +176,9 @@ class ChickenCounter:
 
             track.last_anchor = track.current_anchor
             track.current_anchor = anchor
+            track.bbox = (float(det.x1), float(det.y1), float(det.x2), float(det.y2))
+            track.class_name = det.class_name
+            track.confidence = det.confidence
             track.missed_frames = 0
             track.age += 1
 
@@ -200,6 +206,9 @@ class ChickenCounter:
                     track_id=new_id,
                     last_anchor=anchor,
                     current_anchor=anchor,
+                    bbox=(float(det.x1), float(det.y1), float(det.x2), float(det.y2)),
+                    class_name=det.class_name,
+                    confidence=det.confidence,
                     missed_frames=0,
                     age=0,
                     counted=False,
