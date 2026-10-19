@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Menu, Bell, User } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Menu, Bell, User, LogOut } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { alarmsApi } from "@/features/alarms";
+import { useAuth } from "@/features/auth";
 
 interface HeaderProps {
   onOpenSidebar: () => void;
@@ -9,6 +10,8 @@ interface HeaderProps {
 
 export function Header({ onOpenSidebar }: HeaderProps) {
   const [activeCount, setActiveCount] = useState(0);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     let isMounted = true;
@@ -35,8 +38,15 @@ export function Header({ onOpenSidebar }: HeaderProps) {
     };
   }, []);
 
+  const handleLogout = () => {
+    logout();
+    navigate("/login", { replace: true });
+  };
+
+  const isAdmin = (user?.role || "").toLowerCase() === "admin";
+
   return (
-    <header className="h-16 bg-white px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30">
+    <header className="h-16 bg-white px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 border-b border-slate-100">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -48,7 +58,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
         </button>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 sm:gap-4">
         {/* Notification bell button */}
         <Link
           to="/alarm"
@@ -63,13 +73,29 @@ export function Header({ onOpenSidebar }: HeaderProps) {
           )}
         </Link>
 
-        {/* Operator Profile Badge */}
-        <div className="flex items-center gap-2.5 bg-slate-900 text-white pl-4 pr-1.5 py-1.5 rounded-full text-xs font-medium shadow-sm">
-          <span>Operator Lapangan</span>
-          <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-slate-200">
-            <User className="w-4 h-4" />
+        {/* Dynamic User Profile Badge */}
+        <div className="flex items-center gap-2 bg-slate-900 text-white pl-3.5 pr-1.5 py-1.5 rounded-full text-xs font-medium shadow-sm">
+          <div className="flex flex-col items-start leading-none pr-1">
+            <span className="font-semibold text-slate-100">{user?.username || "Pengguna"}</span>
+            <span className={`text-[10px] font-bold uppercase mt-0.5 ${isAdmin ? "text-indigo-400" : "text-emerald-400"}`}>
+              {user?.role || "Operator"}
+            </span>
+          </div>
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white ${isAdmin ? "bg-indigo-600" : "bg-emerald-600"}`}>
+            <User className="w-3.5 h-3.5" />
           </div>
         </div>
+
+        {/* Logout Button */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          title="Keluar dari sistem"
+          aria-label="Keluar dari sistem"
+          className="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-colors cursor-pointer"
+        >
+          <LogOut className="w-4 h-4" />
+        </button>
       </div>
     </header>
   );
