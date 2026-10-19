@@ -9,6 +9,7 @@ import React, {
 import type { ReactNode } from "react";
 import type { CreateLinePayload, Line, UpdateLinePayload, UserRole } from "@/types";
 import { apiClient } from "@/services/apiClient";
+import { useAuth } from "@/features/auth";
 
 export interface AppContextType {
   currentLineId: string;
@@ -48,6 +49,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
   initialLineId = "line-1",
   initialRole = "ADMIN",
 }) => {
+  const { token } = useAuth();
   const [currentLineId, setCurrentLineId] = useState<string>(initialLineId);
   const setLineId = setCurrentLineId;
   const [currentRole, setRole] = useState<UserRole>(initialRole);
@@ -79,8 +81,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({
   const refreshLines = fetchLines;
 
   useEffect(() => {
-    fetchLines();
-  }, [fetchLines]);
+    if (token) {
+      fetchLines();
+    } else {
+      setLines([FALLBACK_MOCK_LINE]);
+      setIsConnected(false);
+    }
+  }, [token, fetchLines]);
 
   const createLine = useCallback(async (payload: CreateLinePayload) => {
     const newLine = await apiClient.createLine(payload);

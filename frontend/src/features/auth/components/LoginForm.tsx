@@ -133,25 +133,27 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       </form>
 
       {/* Demo Credentials Quick-Fill helper */}
-      <div className="mt-6 pt-5 border-t border-slate-700/60">
-        <p className="text-xs text-slate-400 text-center mb-2.5">Pilih akun demonstrasi:</p>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => handleQuickFill("admin", "admin123")}
-            className="py-1.5 px-3 bg-slate-700/60 hover:bg-slate-700 border border-slate-600/50 rounded-lg text-xs font-medium text-slate-200 transition-colors"
-          >
-            Admin (admin123)
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickFill("operator", "operator123")}
-            className="py-1.5 px-3 bg-slate-700/60 hover:bg-slate-700 border border-slate-600/50 rounded-lg text-xs font-medium text-slate-200 transition-colors"
-          >
-            Operator (operator123)
-          </button>
+      {import.meta.env.DEV && (
+        <div className="mt-6 pt-5 border-t border-slate-700/60">
+          <p className="text-xs text-slate-400 text-center mb-2.5">Pilih akun demonstrasi:</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => handleQuickFill("admin", "admin123")}
+              className="py-1.5 px-3 bg-slate-700/60 hover:bg-slate-700 border border-slate-600/50 rounded-lg text-xs font-medium text-slate-200 transition-colors"
+            >
+              Admin (admin123)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickFill("operator", "operator123")}
+              className="py-1.5 px-3 bg-slate-700/60 hover:bg-slate-700 border border-slate-600/50 rounded-lg text-xs font-medium text-slate-200 transition-colors"
+            >
+              Operator (operator123)
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

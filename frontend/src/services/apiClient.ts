@@ -11,9 +11,9 @@ import type {
   UpdateLinePayload,
   UserDTO,
 } from "../types";
+import { getAuthToken, setAuthToken } from "@/lib/http";
 
-const TOKEN_KEY = "lihat_auth_token";
-let inMemoryToken: string | null = null;
+export { getAuthToken, setAuthToken };
 
 /**
  * Resolve base API URL from environment or default to local dev backend.
@@ -30,45 +30,6 @@ export function getBaseUrl(): string {
     return globalProcess.env.VITE_API_BASE_URL;
   }
   return "";
-}
-
-/**
- * Retrieve current Bearer token from memory or localStorage.
- */
-export function getAuthToken(): string | null {
-  if (inMemoryToken) {
-    return inMemoryToken;
-  }
-  if (typeof window !== "undefined" && window.localStorage) {
-    try {
-      const stored = window.localStorage.getItem(TOKEN_KEY);
-      if (stored) {
-        inMemoryToken = stored;
-        return stored;
-      }
-    } catch {
-      // ignore storage access issues
-    }
-  }
-  return null;
-}
-
-/**
- * Store Bearer token in memory and localStorage.
- */
-export function setAuthToken(token: string | null): void {
-  inMemoryToken = token;
-  if (typeof window !== "undefined" && window.localStorage) {
-    try {
-      if (token) {
-        window.localStorage.setItem(TOKEN_KEY, token);
-      } else {
-        window.localStorage.removeItem(TOKEN_KEY);
-      }
-    } catch {
-      // ignore storage access issues
-    }
-  }
 }
 
 /**
@@ -105,6 +66,15 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     ...options,
     headers,
   });
+
+  if (response.status === 401 || (response.status === 404 && endpoint.includes("/auth/me"))) {
+    if (!endpoint.includes("/auth/login")) {
+      setAuthToken(null);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+      }
+    }
+  }
 
   if (!response.ok) {
     let errorDetail = response.statusText;

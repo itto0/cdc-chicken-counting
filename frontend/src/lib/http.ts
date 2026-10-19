@@ -44,10 +44,13 @@ export async function http<T>(endpoint: string, options: RequestInit = {}): Prom
 
   const response = await fetch(url, { ...options, headers });
 
-  if (response.status === 401) {
+  if (response.status === 401 || (response.status === 404 && endpoint.includes("/auth/me"))) {
     // If request to /me or protected resource failed with 401, clear stale token
     if (!endpoint.includes("/auth/login")) {
       setAuthToken(null);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+      }
     }
   }
 

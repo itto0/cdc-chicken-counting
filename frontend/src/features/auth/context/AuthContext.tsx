@@ -52,6 +52,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [logout]);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      logout();
+    };
+    window.addEventListener("auth:unauthorized", handleUnauthorized);
+    return () => {
+      window.removeEventListener("auth:unauthorized", handleUnauthorized);
+    };
+  }, [logout]);
+
   const value: AuthContextType = {
     user,
     token,

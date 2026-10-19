@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { navigationConfig } from "@/config/navigation";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -33,6 +34,8 @@ function ChickenLogo({ className = "w-9 h-9" }: { className?: string }) {
 }
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const { user } = useAuth();
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -43,6 +46,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
+
+  const navItems = navigationConfig.filter((item) => {
+    if (!item.requiredRole) return true;
+    return (user?.role || "").toLowerCase() === item.requiredRole.toLowerCase();
+  });
 
   return (
     <>
@@ -71,7 +79,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Navigation list */}
         <nav aria-label="Menu Halaman" className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto">
-          {navigationConfig.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
