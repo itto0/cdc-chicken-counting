@@ -14,7 +14,7 @@ A standalone, lightweight edge computer vision service designed for industrial p
   - `shackle`: Industrial poultry conveyor detector with carcass occupancy gradient analysis to reject empty shackles.
   - `onnx`: Hardware-accelerated YOLO inference via ONNX Runtime.
   - `mock`: Light intensity contour segmentation for benchmarking and CPU-only testing.
-- **Remote Configuration**: Automatically fetches line calibration parameters (virtual line coordinates, direction) from the central API on startup with offline fallback to local defaults.
+- **Remote Configuration**: Automatically fetches line calibration parameters (virtual line coordinates, direction, RTSP stream) from the central API on startup using Bearer API Key authentication (`API_TOKEN`), with offline fallback to local defaults.
 - **Real-Time Visual Preview & Headless Modes**: Optional OpenCV display window for on-site line tuning, or headless execution for production Docker containers.
 
 ---
@@ -77,13 +77,14 @@ The service entrypoint is `main.py`. You can configure execution using command-l
    python main.py --source synthetic --show-window
    ```
 
-2. **Run on Video File with Central API Sync:**
+2. **Run on Video File with Central API Sync & Authentication:**
    ```bash
    python main.py \
      --video /path/to/conveyor_sample.mp4 \
      --line-id line-1 \
      --direction right \
      --api-sync-url http://localhost:8000/api/v1/sync/batch \
+     --api-token cdc_live_xxxxxxxxxxxxxxxxxxxxxxxx \
      --loop
    ```
 
@@ -112,6 +113,7 @@ The service entrypoint is `main.py`. You can configure execution using command-l
 | `--direction` | | `down` | Line crossing direction: `down`, `up`, `left`, `right`, `in`, `out`. |
 | `--no-sync` | | `False` | Disable HTTP sync to central API (runs completely offline). |
 | `--api-sync-url` | | `http://localhost:8000/api/v1/sync/batch` | Central API endpoint for batch outbox sync. |
+| `--api-token` | `--api-key` | `""` | Bearer API key/token for authenticating with central cloud API. Eliminates HTTP 401 warnings and enables remote line calibration sync. |
 | `--db-path` | | `counter_outbox.db` | Local SQLite database file path. |
 | `--loop` | | `False` | Loop video continuously instead of exiting at EOF. |
 | `--max-frames` | | `None` | Stop processing after reaching frame count limit. |
@@ -139,6 +141,7 @@ All command-line arguments can also be set via environment variables or a `.env`
 | `LINE_COORDS` | `""` | Manual line coordinates `x1,y1,x2,y2` |
 | `TARGET_FPS` | `30.0` | Frame rate throttle (`0.0` for unthrottled maximum speed) |
 | `API_SYNC_URL` | `http://localhost:8000/api/v1/sync/batch` | Destination URL for outbox batch sync |
+| `API_TOKEN` | `""` | Bearer API key/token for central cloud API authentication (alias: `API_KEY`). Resolves HTTP 401 warnings and enables remote line sync |
 | `DB_PATH` | `/data/counter_outbox.db` | Path to persistent SQLite outbox file |
 | `SYNC_INTERVAL_SEC` | `5.0` | Interval between background sync pushes |
 | `HEALTH_INTERVAL_SEC` | `10.0` | Interval between system health telemetry samples |
@@ -147,6 +150,61 @@ All command-line arguments can also be set via environment variables or a `.env`
 | `NO_SYNC` | `0` | Set `1` to disable central sync completely |
 | `SHOW_WINDOW` | `0` | Set `1` to show visual preview window |
 | `VERBOSE` | `0` | Set `1` to enable debug log output |
+
+---
+
+## Authentication & API Keys
+
+The edge counter interacts with the central API for two distinct operations:
+1. **Startup Remote Line Sync (`GET /api/v1/lines/{line_id}`)**: Pulls authoritative line settings (video RTSP stream URL, line crossing coordinates, line direction) configured in the central cloud dashboard.
+2. **Background Batch Sync (`POST /api/v1/sync/batch`)**: Transmits buffered counting events, aggregates, and system health telemetry.
+
+### Resolving HTTP 401 Unauthorized Warning
+The line details endpoint requires authenticated access. If `API_TOKEN` (or `API_KEY`) is missing or invalid, the service logs:
+```text
+[WARNING] counter.service: Remote line config returned HTTP 401 for line line-1. Check that API_TOKEN or API_KEY is set in your environment. Falling back to local configuration.
+```
+When this occurs, the counter falls back to local command-line or `.env` defaults, and will not adopt settings managed from the cloud dashboard. Setting `API_TOKEN` eliminates this warning and allows the edge counter to automatically adopt line settings (RTSP stream, coordinates, direction) from the central cloud dashboard.
+
+### How to Generate an API Key
+
+#### Option 1: Via Central API CLI
+From the backend server:
+```bash
+python -m services.api.src.cli create-api-key --name "Line 1 Edge"
+```
+Or specify an explicit role (`OPERATOR` or `ADMIN`, defaults to `OPERATOR`):
+```bash
+python -m services.api.src.cli create-api-key --name "Line 1 Edge" --role OPERATOR
+```
+Output:
+```text
+API Key created successfully for 'Line 1 Edge' [OPERATOR]:
+  cdc_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Store this key securely in the edge device's .env file as API_TOKEN.
+```
+
+#### Option 2: Via REST API (`POST /api/v1/auth/api-keys`)
+Admin users can generate keys programmatically:
+```bash
+curl -X POST https://<cdc-api-subdomain>.onrender.com/api/v1/auth/api-keys \
+  -H "Authorization: Bearer <ADMIN_JWT_OR_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Line 1 Edge", "role": "OPERATOR"}'
+```
+Response:
+```json
+{
+  "id": 1,
+  "name": "Line 1 Edge",
+  "api_key": "cdc_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "prefix": "cdc_live_xxxx",
+  "role": "OPERATOR",
+  "created_at": "2026-10-19T10:00:00Z"
+}
+```
+
+Assign the returned `api_key` to `API_TOKEN` in `.env.counter` or your container's environment variables.
 
 ---
 
@@ -178,6 +236,7 @@ docker run --rm \
   -e LOOP_VIDEO=1 \
   -e LINE_DIRECTION=right \
   -e API_SYNC_URL=http://your-central-api:8000/api/v1/sync/batch \
+  -e API_TOKEN=cdc_live_xxxxxxxxxxxxxxxxxxxxxxxx \
   cdc-counter
 ```
 
@@ -194,9 +253,10 @@ Copy the template configuration:
 cp .env.counter.example .env.counter
 ```
 
-Edit `.env.counter` with your central API endpoint and conveyor parameters:
+Edit `.env.counter` with your central API endpoint, authentication key, and conveyor parameters:
 ```dotenv
 API_SYNC_URL=https://cdc-api.onrender.com/api/v1/sync/batch
+API_TOKEN=cdc_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 LINE_ID=line-1
 VIDEO_PATH=/samples/Rekaman_2.MOV
 SAMPLES_DIR=./samples

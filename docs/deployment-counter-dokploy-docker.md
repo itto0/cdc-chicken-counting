@@ -77,6 +77,7 @@ Before deploying the counter container, ensure the following requirements are me
 2. **Video Footage**: A video file representing the poultry shackle conveyor line (e.g. `Rekaman_2.MOV`, `Rekaman_1.MOV`, or an MP4 file) placed in a host directory (default: `./samples`).
 3. **Central API Endpoint**: An accessible cloud API URL for batch synchronization (e.g. `https://<cdc-api-subdomain>.onrender.com/api/v1/sync/batch` or local `http://<lan-ip>:8000/api/v1/sync/batch`).
 4. **Registered Line Identifier**: A valid conveyor line ID matching a record in the central API (the database is pre-seeded with `line-1` and `lineA`).
+5. **API Authentication Key (`API_TOKEN`)**: An API key generated via CLI or REST API to authenticate the edge counter with the central cloud API, eliminating HTTP 401 warnings and enabling automatic remote line calibration synchronization.
 
 ---
 
@@ -87,6 +88,7 @@ The counter configuration is controlled through environment variables defined in
 | Variable | Type | Default Value | Description |
 | :--- | :--- | :--- | :--- |
 | `API_SYNC_URL` | String (URL) | `https://cdc-api.onrender.com/api/v1/sync/batch` | Destination API batch sync endpoint for events and telemetry. |
+| `API_TOKEN` | String | `""` | Bearer API key/token for central cloud API authentication (alias: `API_KEY`). Eliminates HTTP 401 warnings and enables dynamic synchronization of conveyor settings (video RTSP feed, tripwire coordinates, crossing direction). |
 | `LINE_ID` | String | `line-1` | Conveyor line identifier (must match an active line in central database). |
 | `VIDEO_PATH` | String (Path) | `/samples/Rekaman_2.MOV` | Absolute path inside the container to the video file to process. |
 | `SAMPLES_DIR` | String (Path) | `./samples` | Host directory containing the video files, mounted to `/samples:ro`. |
@@ -100,6 +102,56 @@ The counter configuration is controlled through environment variables defined in
 | `OCCUPANCY_THRESHOLD` | Float | `4.5` | Gradient threshold for `ShackleDetector` to reject empty hanging shackles. |
 | `DETECTOR_TYPE` | String | `auto` | Detection engine: `auto`, `shackle`, `mock`, or `onnx`. |
 | `LOG_LEVEL` | String | `WARNING` | Console logging verbosity: `DEBUG`, `INFO`, or `WARNING`. |
+
+### 3.1 API Key Generation & Remote Line Configuration
+
+The central API enforces role-based access control (RBAC). When the edge counter boots up, it contacts `GET /api/v1/lines/{line_id}` to fetch centrally configured conveyor settings (RTSP video stream, virtual tripwire coordinates `x1,y1,x2,y2`, and crossing direction).
+
+#### Resolving HTTP 401 Warnings
+If `API_TOKEN` (or `API_KEY`) is not configured or invalid, the edge counter outputs:
+```text
+[WARNING] counter.service: Remote line config returned HTTP 401 (Unauthorized) for line line-1. Check that API_TOKEN or API_KEY is set in your environment. Falling back to local configuration.
+```
+While local counting continues using fallback defaults, the edge device cannot pull updated coordinates or camera stream URLs from the central cloud dashboard. Configuring a valid `API_TOKEN` eliminates this warning and allows the edge counter to automatically adopt line settings (RTSP stream, coordinates, direction) configured by plant supervisors on the cloud dashboard without restarting or modifying local configuration files.
+
+#### Generating an API Key
+
+##### Option A: Central API CLI
+Run the admin CLI on the backend server:
+```bash
+python -m services.api.src.cli create-api-key --name "Line 1 Edge"
+```
+Optional `--role` flag defaults to `OPERATOR` (`OPERATOR` or `ADMIN`):
+```bash
+python -m services.api.src.cli create-api-key --name "Line 1 Edge" --role OPERATOR
+```
+Output:
+```text
+API Key created successfully for 'Line 1 Edge' [OPERATOR]:
+  cdc_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Store this key securely in the edge device's .env file as API_TOKEN.
+```
+
+##### Option B: REST API Endpoint (`POST /api/v1/auth/api-keys`)
+Admin users can generate edge keys programmatically via the REST API:
+```bash
+curl -X POST https://<cdc-api-subdomain>.onrender.com/api/v1/auth/api-keys \
+  -H "Authorization: Bearer <ADMIN_JWT_OR_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Line 1 Edge", "role": "OPERATOR"}'
+```
+Response:
+```json
+{
+  "id": 1,
+  "name": "Line 1 Edge",
+  "api_key": "cdc_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "prefix": "cdc_live_xxxx",
+  "role": "OPERATOR",
+  "created_at": "2026-10-19T10:00:00Z"
+}
+```
+Copy the `api_key` string and assign it to `API_TOKEN` in your edge `.env` or Dokploy environment configuration.
 
 ---
 
@@ -144,6 +196,7 @@ You can configure Compose via Git or Raw YAML:
           - LINE_DIRECTION=${LINE_DIRECTION:-right}
           - TARGET_FPS=${TARGET_FPS:-30.0}
           - API_SYNC_URL=${API_SYNC_URL:-https://cdc-api.onrender.com/api/v1/sync/batch}
+          - API_TOKEN=${API_TOKEN:-}
           - DB_PATH=/data/counter_outbox.db
           - SYNC_INTERVAL_SEC=${SYNC_INTERVAL_SEC:-5.0}
           - HEALTH_INTERVAL_SEC=${HEALTH_INTERVAL_SEC:-10.0}
@@ -162,6 +215,7 @@ You can configure Compose via Git or Raw YAML:
 2. Click **Add Environment Variable** (or paste bulk content from `.env.counter.example`):
    ```ini
    API_SYNC_URL=https://<cdc-api-subdomain>.onrender.com/api/v1/sync/batch
+   API_TOKEN=cdc_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
    LINE_ID=line-1
    VIDEO_PATH=/samples/Rekaman_2.MOV
    SAMPLES_DIR=/var/dokploy/samples
@@ -231,6 +285,7 @@ If you prefer using Dokploy's single **Application** service type instead of Com
 In the **Environment** tab, set:
 ```ini
 API_SYNC_URL=https://<cdc-api-subdomain>.onrender.com/api/v1/sync/batch
+API_TOKEN=cdc_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 LINE_ID=line-1
 VIDEO_PATH=/samples/Rekaman_2.MOV
 LOOP_VIDEO=1
@@ -280,6 +335,7 @@ nano .env
 Update `API_SYNC_URL` to point to your cloud deployment:
 ```ini
 API_SYNC_URL=https://<cdc-api-subdomain>.onrender.com/api/v1/sync/batch
+API_TOKEN=cdc_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 LINE_ID=line-1
 VIDEO_PATH=/samples/Rekaman_2.MOV
 SAMPLES_DIR=./samples
@@ -346,6 +402,7 @@ docker run -d \
   -v counter_data:/data \
   -v "$(pwd)/samples:/samples:ro" \
   -e API_SYNC_URL="https://<cdc-api-subdomain>.onrender.com/api/v1/sync/batch" \
+  -e API_TOKEN="cdc_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
   -e LINE_ID="line-1" \
   -e VIDEO_PATH="/samples/Rekaman_2.MOV" \
   -e LOOP_VIDEO="1" \
@@ -365,6 +422,7 @@ docker run -d `
   -v counter_data:/data `
   -v "${PWD}/samples:/samples:ro" `
   -e API_SYNC_URL="https://<cdc-api-subdomain>.onrender.com/api/v1/sync/batch" `
+  -e API_TOKEN="cdc_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" `
   -e LINE_ID="line-1" `
   -e VIDEO_PATH="/samples/Rekaman_2.MOV" `
   -e LOOP_VIDEO="1" `
@@ -411,6 +469,7 @@ services:
       - LINE_DIRECTION=right
       - TARGET_FPS=30.0
       - API_SYNC_URL=https://<cdc-api-subdomain>.onrender.com/api/v1/sync/batch
+      - API_TOKEN=${API_TOKEN_LINE1:-}
       - DB_PATH=/data/counter_outbox.db
       - SYNC_INTERVAL_SEC=5.0
       - HEALTH_INTERVAL_SEC=10.0
@@ -434,6 +493,7 @@ services:
       - LINE_DIRECTION=right
       - TARGET_FPS=30.0
       - API_SYNC_URL=https://<cdc-api-subdomain>.onrender.com/api/v1/sync/batch
+      - API_TOKEN=${API_TOKEN_LINEA:-}
       - DB_PATH=/data/counter_outbox.db
       - SYNC_INTERVAL_SEC=5.0
       - HEALTH_INTERVAL_SEC=10.0
@@ -596,6 +656,7 @@ To test that the local SQLite buffer functions properly during network outages:
 | :--- | :--- | :--- |
 | **Exits immediately with "Reached end of video stream" (Total Frames: 0)** | The video path specified by `VIDEO_PATH` does not exist inside the container. | Check that `SAMPLES_DIR` on the host contains the file and is mounted to `/samples:ro`. Ensure case sensitivity matches (`Rekaman_2.MOV` vs `rekaman_2.mov`). |
 | **`HTTP 404 / 422: Line not found`** | `LINE_ID` does not exist in central API database. | The default database seeds `line-1` and `lineA`. If using a custom line ID, create the line first in the central web dashboard or via `POST /api/v1/lines`. |
+| **`Remote line config returned HTTP 401 for line line-1`** | `API_TOKEN` is missing, invalid, or expired. Central API line details endpoint `/api/v1/lines/{line_id}` requires authenticated access. | Generate an API key using `python -m services.api.src.cli create-api-key --name "<device-name>"` or `POST /api/v1/auth/api-keys` and set `API_TOKEN` in the environment. |
 | **OpenCV video decoding error** | Incompatible video container or proprietary video codec. | The container runs `opencv-python-headless` with standard FFmpeg decoders. Transcode the video to H.264 MP4: `ffmpeg -i input.mov -c:v libx264 -pix_fmt yuv420p samples/Rekaman_2.MOV`. |
 | **Render Cloud 502 / Spin-up Delay** | Free-tier Render instances spin down after inactivity (~50s cold start). | The edge counter's SQLite outbox and exponential backoff retry handle this automatically. No action needed; records flush as soon as the Render service wakes up. |
 | **`sqlite3.OperationalError: database is locked`** | Multiple container instances mounting the same host directory or SQLite file. | Ensure each container has its own isolated named volume for `/data` (e.g. `counter_data_line1`, `counter_data_line2`). |
