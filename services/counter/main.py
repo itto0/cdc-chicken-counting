@@ -453,14 +453,14 @@ class CounterService:
 
     def _render_window_frame(
         self, frame: object, detections: list, events: list
-    ) -> None:
+    ) -> Optional[object]:
         """Render annotations on frame and show in an OpenCV window."""
         try:
             import cv2
             import numpy as np
 
             if not isinstance(frame, np.ndarray):
-                return
+                return None
             vis = frame.copy()
             h, w = vis.shape[:2]
 
@@ -479,33 +479,60 @@ class CounterService:
                 2,
             )
 
-            # Draw active tracks with their track ID & anchor
-            for track_id, track in self.counter.tracks.items():
-                cx, cy = int(track.current_anchor[0]), int(track.current_anchor[1])
-                cv2.circle(vis, (cx, cy), 5, (0, 255, 255), -1)
-                cv2.putText(
-                    vis,
-                    f"#{track_id}",
-                    (cx - 15, cy - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (0, 255, 255),
-                    2,
-                )
+            # Track rendered detection coordinates to avoid duplicate bounding boxes
+            rendered_boxes: set[tuple[int, int, int, int]] = set()
 
-            # Draw detections
-            for det in detections:
-                x1, y1, x2, y2 = int(det.x1), int(det.y1), int(det.x2), int(det.y2)
-                cv2.rectangle(vis, (x1, y1), (x2, y2), (0, 220, 0), 2)
+            # Draw active tracks with their track ID, dynamic color, and status label
+            for track_id, track in self.counter.tracks.items():
+                if track.missed_frames > 0:
+                    continue  # Do not render stale tracks / ghosts
+
+                x1, y1, x2, y2 = (
+                    int(track.bbox[0]),
+                    int(track.bbox[1]),
+                    int(track.bbox[2]),
+                    int(track.bbox[3]),
+                )
+                rendered_boxes.add((x1, y1, x2, y2))
+
+                if track.counted:
+                    box_color = (0, 220, 0)  # Green
+                    label = f"{track.class_name} #{track_id} {track.confidence:.2f} [COUNTED]"
+                else:
+                    box_color = (0, 180, 255)  # Orange
+                    label = f"{track.class_name} #{track_id} {track.confidence:.2f}"
+
+                cv2.rectangle(vis, (x1, y1), (x2, y2), box_color, 2)
                 cv2.putText(
                     vis,
-                    f"{det.class_name} {det.confidence:.2f}",
+                    label,
                     (x1, max(20, y1 - 6)),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.45,
-                    (0, 220, 0),
+                    box_color,
                     1,
                 )
+
+                # Track anchor center
+                cx, cy = int(track.current_anchor[0]), int(track.current_anchor[1])
+                cv2.circle(vis, (cx, cy), 5, (0, 255, 255), -1)
+
+            # Draw any detections not matched to an active track with default uncounted styling
+            for det in detections:
+                box_coords = (int(det.x1), int(det.y1), int(det.x2), int(det.y2))
+                if box_coords not in rendered_boxes:
+                    x1, y1, x2, y2 = box_coords
+                    box_color = (0, 180, 255)
+                    cv2.rectangle(vis, (x1, y1), (x2, y2), box_color, 2)
+                    cv2.putText(
+                        vis,
+                        f"{det.class_name} {det.confidence:.2f}",
+                        (x1, max(20, y1 - 6)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.45,
+                        box_color,
+                        1,
+                    )
 
             # Flash crossing event banner if occurred on this frame
             if events:
@@ -540,8 +567,10 @@ class CounterService:
                 cv2.resizeWindow(win_name, 1280, int(1280 * (h / w)))
             cv2.imshow(win_name, vis)
             cv2.waitKey(1)
+            return vis
         except Exception as e:
             logger.debug("Error in visual preview: %s", e)
+            return None
 
     def _print_cli_header(self) -> None:
         res_info = ""

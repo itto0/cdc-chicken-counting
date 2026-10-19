@@ -295,3 +295,113 @@ def test_main_argv_shackle_detector_options(tmp_path):
     assert Path(db_path).exists()
 
 
+def test_render_window_frame_bounding_box_colors(tmp_path):
+    """Verify _render_window_frame colors uncounted tracks orange and counted tracks green."""
+    import numpy as np
+    from unittest.mock import patch
+    from services.counter.src.detection.detector import Detection
+    from services.counter.src.tracking.tracker import TrackedObject
+
+    db_file = str(tmp_path / "test_render.db")
+    service = CounterService(
+        line_id="lineRender",
+        video_source_type="synthetic",
+        db_path=db_file,
+    )
+
+    # Track 1: uncounted
+    track1 = TrackedObject(
+        track_id=1,
+        last_anchor=(100.0, 150.0),
+        current_anchor=(100.0, 150.0),
+        bbox=(50.0, 50.0, 150.0, 150.0),
+        class_name="chicken",
+        confidence=0.91,
+        counted=False,
+        missed_frames=0,
+    )
+    # Track 2: counted
+    track2 = TrackedObject(
+        track_id=2,
+        last_anchor=(300.0, 350.0),
+        current_anchor=(300.0, 350.0),
+        bbox=(250.0, 250.0, 350.0, 350.0),
+        class_name="chicken",
+        confidence=0.95,
+        counted=True,
+        missed_frames=0,
+    )
+    service.counter.tracks = {1: track1, 2: track2}
+
+    dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+
+    with patch("cv2.imshow"), patch("cv2.namedWindow"), patch("cv2.resizeWindow"), patch("cv2.waitKey"):
+        vis = service._render_window_frame(dummy_frame, detections=[], events=[])
+
+    assert vis is not None
+    # Track 1 border at (x=50, y=50) should be Orange (BGR: 0, 180, 255)
+    # Pixel on boundary:
+    assert tuple(vis[50, 100]) == (0, 180, 255)
+    # Track 2 border at (x=250, y=250) should be Green (BGR: 0, 220, 0)
+    assert tuple(vis[250, 300]) == (0, 220, 0)
+
+
+def test_render_window_frame_stale_tracks_and_unmatched_detections(tmp_path):
+    """Verify stale tracks are skipped and unmatched detections are rendered orange."""
+    import numpy as np
+    from unittest.mock import patch
+    from services.counter.src.detection.detector import Detection
+    from services.counter.src.tracking.tracker import TrackedObject
+
+    db_file = str(tmp_path / "test_render2.db")
+    service = CounterService(
+        line_id="lineRender",
+        video_source_type="synthetic",
+        db_path=db_file,
+    )
+
+    # Stale track (missed_frames > 0)
+    stale_track = TrackedObject(
+        track_id=3,
+        last_anchor=(400.0, 400.0),
+        current_anchor=(400.0, 400.0),
+        bbox=(380.0, 380.0, 420.0, 420.0),
+        class_name="chicken",
+        confidence=0.9,
+        counted=False,
+        missed_frames=1,
+    )
+    service.counter.tracks = {3: stale_track}
+
+    # Unmatched detection
+    det = Detection(
+        x1=50.0,
+        y1=50.0,
+        x2=150.0,
+        y2=150.0,
+        confidence=0.88,
+        class_id=0,
+        class_name="chicken",
+    )
+
+    dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+
+    with patch("cv2.imshow"), patch("cv2.namedWindow"), patch("cv2.resizeWindow"), patch("cv2.waitKey"):
+        vis = service._render_window_frame(dummy_frame, detections=[det], events=[])
+
+    assert vis is not None
+    # Stale track should NOT be rendered (box boundary remains black)
+    assert tuple(vis[380, 400]) == (0, 0, 0)
+    # Unmatched detection should be rendered in Orange (BGR: 0, 180, 255)
+    assert tuple(vis[50, 100]) == (0, 180, 255)
+
+
+def test_render_window_frame_invalid_frame(tmp_path):
+    """Verify _render_window_frame returns None when given invalid frame."""
+    db_file = str(tmp_path / "test_render3.db")
+    service = CounterService(line_id="lineRender", video_source_type="synthetic", db_path=db_file)
+    assert service._render_window_frame(None, detections=[], events=[]) is None
+    assert service._render_window_frame("not_a_frame", detections=[], events=[]) is None
+
+
+
