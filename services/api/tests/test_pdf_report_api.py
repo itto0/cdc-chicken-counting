@@ -253,7 +253,7 @@ def test_export_report_tie_breaking_order():
     import openpyxl
     from reportlab.platypus import Table
     from services.api.src.db.models import CountAggregate
-    from services.api.src.db.session import get_db
+    from services.api.src.api.reports import get_db
     from services.api.src.main import app
 
     engine = create_engine(
