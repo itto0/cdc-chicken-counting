@@ -84,7 +84,7 @@ def get_cors_origins(env_origins: str | None = None) -> list[str]:
     raw = env_origins if env_origins is not None else os.getenv("CORS_ORIGINS", "*")
     if not raw or raw.strip() == "*":
         return ["*"]
-    origins = [item.strip() for item in raw.split(",") if item.strip()]
+    origins = [item.strip().rstrip("/") for item in raw.split(",") if item.strip()]
     return origins if origins else ["*"]
 
 

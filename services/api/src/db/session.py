@@ -16,6 +16,7 @@ def resolve_database_url(url: str | None = None) -> str:
     if raw_url.startswith("postgresql://") and "+psycopg" not in raw_url:
         try:
             import psycopg  # noqa: F401
+            raw_url = "postgresql+psycopg://" + raw_url[len("postgresql://"):]
         except ImportError:
             try:
                 import psycopg2  # noqa: F401

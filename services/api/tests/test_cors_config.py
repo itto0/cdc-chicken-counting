@@ -10,7 +10,7 @@ def test_cors_origins_wildcard():
 
 def test_cors_origins_multiple_domains():
     env_str = "https://cdc-frontend.onrender.com, http://localhost:3000, https://custom.com/"
-    expected = ["https://cdc-frontend.onrender.com", "http://localhost:3000", "https://custom.com/"]
+    expected = ["https://cdc-frontend.onrender.com", "http://localhost:3000", "https://custom.com"]
     assert get_cors_origins(env_str) == expected
 
 

@@ -297,7 +297,7 @@ When `cdc-api` runs for the first time, its database migration and seeding routi
 ### Default Production Lines
 
 The initial seed creates two preconfigured conveyor lines:
-* **`line1`**: *Lini Konveyor 1* (Daily target: 50,000 birds)
+* **`line-1`**: *Lini Konveyor 1* (Daily target: 62,000 birds)
 * **`lineA`**: *Lini Konveyor A* (Daily target: 62,000 birds)
 
 ### Interactive API Documentation

@@ -1,11 +1,12 @@
 export function formatApiBaseUrl(url: string | undefined): string {
   if (!url) return "";
   const trimmed = url.trim();
-  if (trimmed === "" || trimmed.startsWith("/")) return trimmed;
-  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-    return `https://${trimmed}`;
+  if (trimmed === "" || trimmed === "/") return trimmed;
+  let formatted = trimmed;
+  if (!formatted.startsWith("http://") && !formatted.startsWith("https://") && !formatted.startsWith("/")) {
+    formatted = `https://${formatted}`;
   }
-  return trimmed;
+  return formatted.replace(/\/+$/, "");
 }
 
 export const env = {
