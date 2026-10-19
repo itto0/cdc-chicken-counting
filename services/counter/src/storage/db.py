@@ -5,12 +5,28 @@ from pathlib import Path
 import sqlite3
 import threading
 from typing import Any
-from shared.contracts import (
-    CountEventDTO,
-    CountAggregateDTO,
-    HealthSampleDTO,
-    SyncBatchPayload,
-)
+try:
+    from src.contracts import (
+        CountAggregateDTO,
+        CountEventDTO,
+        HealthSampleDTO,
+        SyncBatchPayload,
+    )
+except ImportError:
+    try:
+        from services.counter.src.contracts import (
+            CountAggregateDTO,
+            CountEventDTO,
+            HealthSampleDTO,
+            SyncBatchPayload,
+        )
+    except ImportError:
+        from shared.contracts import (
+            CountAggregateDTO,
+            CountEventDTO,
+            HealthSampleDTO,
+            SyncBatchPayload,
+        )
 
 
 class LocalStorage:

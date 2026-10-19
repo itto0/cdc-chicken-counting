@@ -3,8 +3,18 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from services.counter.src.detection.detector import Detection
-from shared.contracts import CountEventDTO
+try:
+    from src.detection.detector import Detection
+except ImportError:
+    from services.counter.src.detection.detector import Detection
+
+try:
+    from src.contracts import CountEventDTO
+except ImportError:
+    try:
+        from services.counter.src.contracts import CountEventDTO
+    except ImportError:
+        from shared.contracts import CountEventDTO
 
 __all__ = ["TrackedObject", "VirtualLineZone", "ChickenCounter"]
 

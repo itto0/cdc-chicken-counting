@@ -2,7 +2,18 @@
 
 from typing import Any
 import httpx
-from services.counter.src.storage.db import LocalStorage
+try:
+    from src.storage.db import LocalStorage
+except ImportError:
+    from services.counter.src.storage.db import LocalStorage
+
+try:
+    from src.contracts import SyncBatchPayload
+except ImportError:
+    try:
+        from services.counter.src.contracts import SyncBatchPayload
+    except ImportError:
+        from shared.contracts import SyncBatchPayload
 
 
 class OutboxSyncDispatcher:
