@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type FormEvent } from "react";
+import { useState, useEffect, useRef, useCallback, type FormEvent } from "react";
 import { X, Copy, Check, AlertTriangle, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,10 +43,10 @@ export function CreateApiKeyModal({ isOpen, onClose, onSubmit }: CreateApiKeyMod
     };
   }, [isOpen]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     resetAllState();
     onClose();
-  };
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -58,7 +58,7 @@ export function CreateApiKeyModal({ isOpen, onClose, onSubmit }: CreateApiKeyMod
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, isSubmitting, createdResult]);
+  }, [isOpen, isSubmitting, createdResult, handleClose]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -174,6 +174,7 @@ export function CreateApiKeyModal({ isOpen, onClose, onSubmit }: CreateApiKeyMod
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Contoh: Edge Counter Conveyor 1"
+                  maxLength={100}
                   required
                   disabled={isSubmitting}
                   autoFocus
