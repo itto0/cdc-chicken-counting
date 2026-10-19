@@ -126,7 +126,7 @@ If you prefer provisioning each component manually through the Render Dashboard 
 2. Configure settings:
    * **Name**: `cdc-postgres`
    * **Database**: `chicken_counting`
-   * **User**: `postgres`
+   * **User**: *(leave blank for Render to auto-generate a valid user, or specify e.g. `cdc_admin`. Note: `postgres` is a reserved system role and will be rejected by Render)*
    * **Region**: `Oregon (US West)` *(recommended; use same region for all components)*
    * **Plan**: `Free` (or `Starter` for production)
 3. Click **Create Database**.

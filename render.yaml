@@ -1,9 +1,8 @@
 databases:
   - name: cdc-postgres
     databaseName: chicken_counting
-    user: postgres
     plan: free
-    region: indonesia
+    region: singapore
 
 services:
   - type: web
@@ -12,7 +11,7 @@ services:
     dockerfilePath: ./services/api/Dockerfile
     dockerContext: .
     plan: free
-    region: indonesia
+    region: singapore
     healthCheckPath: /healthz
     envVars:
       - key: DATABASE_URL
@@ -32,8 +31,6 @@ services:
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
-    plan: free
-    region: indonesia
     routes:
       - type: rewrite
         source: /*
