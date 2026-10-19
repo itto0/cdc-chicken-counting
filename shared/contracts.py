@@ -5,14 +5,14 @@ from pydantic import BaseModel, Field
 
 try:
     try:
-        from src.contracts import (
+        from services.counter.src.contracts import (
             CountAggregateDTO,
             CountEventDTO,
             HealthSampleDTO,
             SyncBatchPayload,
         )
     except ImportError:
-        from services.counter.src.contracts import (
+        from src.contracts import (
             CountAggregateDTO,
             CountEventDTO,
             HealthSampleDTO,

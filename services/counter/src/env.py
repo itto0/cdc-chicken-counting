@@ -21,7 +21,7 @@ __all__ = ["init_env"]
 import sys
 
 _self_module = sys.modules.get(__name__)
-if _self_module is not None:
+if _self_module is not None and __name__ != "__main__":
     for _alias in ("src.env", "services.counter.src.env"):
         sys.modules.setdefault(_alias, _self_module)
 
