@@ -39,8 +39,8 @@ services:
 
   counter:
     build:
-      context: .
-      dockerfile: services/counter/Dockerfile
+      context: ./services/counter
+      dockerfile: Dockerfile
     env_file:
       - .env
     environment:
