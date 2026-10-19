@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from fastapi import FastAPI
@@ -79,6 +80,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
 
+def get_cors_origins(env_origins: str | None = None) -> list[str]:
+    raw = env_origins if env_origins is not None else os.getenv("CORS_ORIGINS", "*")
+    if not raw or raw.strip() == "*":
+        return ["*"]
+    origins = [item.strip() for item in raw.split(",") if item.strip()]
+    return origins if origins else ["*"]
+
+
 app = FastAPI(
     title="Lihat.id Poultry Counter Data API",
     version="0.1.0",
@@ -87,7 +96,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=get_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
