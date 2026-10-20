@@ -11,7 +11,6 @@ from services.api.src.main import app
 from services.api.src.services.auth import (
     create_access_token,
     generate_api_key,
-    hash_api_key,
     hash_password,
 )
 from services.api.src.services.preview import (

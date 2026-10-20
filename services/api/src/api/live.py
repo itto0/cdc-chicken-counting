@@ -236,7 +236,7 @@ async def upload_frame(
     line_id: str,
     request: Request,
     current_user: UserDTO = Depends(require_role(["operator", "admin"])),
-):
+) -> Response:
     """Ingest uploaded JPEG frame from edge device or authorized operator/admin."""
     line_slug = line_id.strip()
     if not line_slug:
