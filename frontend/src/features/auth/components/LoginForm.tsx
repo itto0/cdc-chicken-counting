@@ -61,7 +61,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         <div>
           <label
             htmlFor="username"
-            className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5"
+            className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
           >
             Nama Pengguna
           </label>
@@ -86,7 +86,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         <div>
           <label
             htmlFor="password"
-            className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5"
+            className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
           >
             Kata Sandi
           </label>
