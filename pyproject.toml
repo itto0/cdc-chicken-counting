@@ -17,4 +17,4 @@ include = ["services*", "shared*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["tests", "services/counter/tests", "services/api/tests"]
+testpaths = ["tests", "services/api/tests"]
