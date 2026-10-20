@@ -1,8 +1,51 @@
 import os
 import threading
+import time
 from datetime import datetime
 import cv2
 import numpy as np
+
+_relay_lock = threading.Lock()
+_active_viewers: dict[str, float] = {}
+_latest_frames: dict[str, tuple[bytes, float]] = {}
+
+
+def record_viewer_activity(line_id: str) -> None:
+    """Record that an active viewer is watching the preview stream for line_id."""
+    with _relay_lock:
+        _active_viewers[line_id] = time.time()
+
+
+def is_stream_requested(line_id: str, timeout_sec: float = 10.0) -> bool:
+    """Check if any active viewer has watched line_id in the last timeout_sec seconds."""
+    with _relay_lock:
+        last_seen = _active_viewers.get(line_id, 0.0)
+    return (time.time() - last_seen) < timeout_sec
+
+
+def store_live_frame(line_id: str, frame_bytes: bytes) -> None:
+    """Store the newest uploaded JPEG frame for line_id."""
+    with _relay_lock:
+        _latest_frames[line_id] = (frame_bytes, time.time())
+
+
+def get_live_frame(line_id: str, max_age_sec: float = 8.0) -> bytes | None:
+    """Retrieve the latest uploaded JPEG frame if not older than max_age_sec."""
+    with _relay_lock:
+        item = _latest_frames.get(line_id)
+    if item is None:
+        return None
+    frame_bytes, ts = item
+    if (time.time() - ts) > max_age_sec:
+        return None
+    return frame_bytes
+
+
+def clear_relay_buffer() -> None:
+    """Clear in-memory viewer tracking and frame cache (useful for tests)."""
+    with _relay_lock:
+        _active_viewers.clear()
+        _latest_frames.clear()
 
 
 class FrameGenerator:
@@ -85,6 +128,10 @@ class FrameGenerator:
 
     @classmethod
     def generate_jpeg_frame(cls, line_id: str, frame_num: int = 0) -> bytes:
+        live_frame = get_live_frame(line_id, max_age_sec=8.0)
+        if live_frame is not None:
+            return live_frame
+
         safe_frame_num = max(0, frame_num)
         video_path = cls._resolve_video_path()
 

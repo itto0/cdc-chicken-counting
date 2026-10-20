@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
-from services.api.src.services.preview import FrameGenerator
+from services.api.src.services.preview import FrameGenerator, record_viewer_activity
 
 router = APIRouter(prefix="/api/v1/lines", tags=["live"])
 
@@ -204,6 +204,7 @@ async def preview_stream(
                     break
                 if await request.is_disconnected():
                     break
+                record_viewer_activity(line_id)
                 jpeg_bytes = await asyncio.to_thread(FrameGenerator.generate_jpeg_frame, line_id, frame_idx)
                 yield (
                     b"--frame\r\n"

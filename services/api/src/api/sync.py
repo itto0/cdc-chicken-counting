@@ -8,6 +8,7 @@ from services.api.src.api.live import broadcast_line_update
 from services.api.src.db.models import CountAggregate, CountEvent, HealthSample
 from services.api.src.db.session import get_db
 from services.api.src.services.alarms import AlarmEvaluator
+from services.api.src.services.preview import is_stream_requested
 from shared.contracts import SyncBatchPayload
 
 router = APIRouter(prefix="/api/v1/sync", tags=["sync"])
@@ -150,4 +151,5 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
         "duplicates_skipped": duplicates_skipped,
         "ingested_aggregates": ingested_aggregates,
         "health_ingested": health_ingested,
+        "stream_requested": is_stream_requested(payload.line_id),
     }
