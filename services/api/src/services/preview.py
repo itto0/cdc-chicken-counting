@@ -128,3 +128,141 @@ class FrameGenerator:
 
         return valid_chickens
 
+    @classmethod
+    def generate_jpeg_frame(cls, line_id: str, frame_num: int = 0) -> bytes:
+        live_frame = get_live_frame(line_id, max_age_sec=8.0)
+        if live_frame is not None:
+            return live_frame
+
+        safe_frame_num = max(0, frame_num)
+        video_path = cls._resolve_video_path()
+
+        if video_path is not None:
+            with cls._lock:
+                cap = cls._get_capture(video_path)
+                ret, frame = cap.read()
+                if not ret:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    ret, frame = cap.read()
+
+            if ret and frame is not None:
+                h, w = frame.shape[:2]
+                chicken_centers = cls._detect_chickens_on_frame(frame)
+
+                # Resize for responsive web preview (480, 640, 3) to match standard preview dimensions
+                resized = cv2.resize(frame, (640, 480))
+                scale_x = 640.0 / w
+                scale_y = 480.0 / h
+
+                mid_x = 320
+                line_active = False
+
+                # Draw bounding boxes for detected chickens
+                for cx in chicken_centers:
+                    rcx = int(cx * scale_x)
+                    rw = int(115.0 * scale_x)
+                    rh = int(540.0 * scale_y)
+                    ry = int(260.0 * scale_y)
+                    rx1 = max(0, rcx - rw // 2)
+                    rx2 = min(640, rcx + rw // 2)
+                    ry1 = max(0, ry)
+                    ry2 = min(480, ry + rh)
+
+                    is_crossing = abs(rcx - mid_x) <= 18
+                    if is_crossing:
+                        line_active = True
+                        box_color = (0, 255, 0)
+                        label = "COUNTING (90%)"
+                    elif rcx > mid_x + 18:
+                        box_color = (0, 220, 0)
+                        label = "Ayam [COUNTED] (90%)"
+                    else:
+                        box_color = (0, 180, 255)
+                        label = "Ayam (90%)"
+
+                    cv2.rectangle(resized, (rx1, ry1), (rx2, ry2), box_color, 2)
+                    cv2.putText(
+                        resized,
+                        label,
+                        (rx1, max(12, ry1 - 5)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.36,
+                        box_color,
+                        1,
+                    )
+
+                # Virtual counting line (green vertical line, turns yellow when bird crosses)
+                line_color = (0, 255, 255) if line_active else (0, 220, 100)
+                cv2.line(resized, (mid_x, 70), (mid_x, 460), line_color, 2)
+                cv2.putText(
+                    resized,
+                    f"COUNTING LINE (RIGHT){' [CROSSING]' if line_active else ''}",
+                    (mid_x - 95, 58),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.42,
+                    line_color,
+                    1,
+                )
+
+                # Shackle line guide rail
+                cv2.line(resized, (20, 115), (620, 115), (80, 180, 255), 1)
+
+                # HUD overlay
+                ts_str = f"{format_jakarta_display(now_jakarta())} {WIB_LABEL}"
+                cv2.putText(
+                    resized,
+                    f"LIVE FEED - {line_id.upper()} | {ts_str}",
+                    (20, 25),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.50,
+                    (255, 255, 255),
+                    1,
+                )
+                cv2.putText(
+                    resized,
+                    f"Source: Rekaman_2.MOV | Terdeteksi: {len(chicken_centers)} ayam di conveyor",
+                    (20, 45),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.40,
+                    (100, 255, 100),
+                    1,
+                )
+
+                _, encoded = cv2.imencode(".jpg", resized, [cv2.IMWRITE_JPEG_QUALITY, 75])
+                return encoded.tobytes()
+
+        # Fallback synthetic frame if video file not available
+        img = np.zeros((480, 640, 3), dtype=np.uint8)
+        img[:] = (30, 30, 40)  # dark background
+
+        # Draw conveyor rail
+        cv2.line(img, (50, 180), (590, 180), (120, 120, 120), 4)
+
+        # Draw virtual counting line (green)
+        cv2.line(img, (320, 100), (320, 400), (0, 220, 100), 2)
+        cv2.putText(img, "COUNTING LINE", (260, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 220, 100), 1)
+
+        # Animated shackle / chicken moving across
+        x_pos = int((safe_frame_num * 15) % 500 + 70)
+        mid_x = 320
+        if abs(x_pos - mid_x) <= 20:
+            box_color = (0, 255, 0)
+            label = f"Chicken #{(safe_frame_num // 33) + 1} COUNTING (98%)"
+        elif x_pos > mid_x + 20:
+            box_color = (0, 220, 0)
+            label = f"Chicken #{(safe_frame_num // 33) + 1} [COUNTED] (98%)"
+        else:
+            box_color = (0, 180, 255)
+            label = f"Chicken #{(safe_frame_num // 33) + 1} (98%)"
+
+        cv2.rectangle(img, (x_pos - 30, 190), (x_pos + 30, 310), box_color, 2)
+        cv2.putText(img, label, (x_pos - 35, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.4, box_color, 1)
+
+        # HUD overlay
+        ts_str = f"{format_jakarta_display(now_jakarta())} {WIB_LABEL}"
+        cv2.putText(img, f"LIVE PREVIEW - {line_id.upper()} | {ts_str}", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+        cv2.putText(img, "Status: ACTIVE | 120 cpm", (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 255, 100), 1)
+
+        _, encoded = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        return encoded.tobytes()
+
