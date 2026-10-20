@@ -1,9 +1,12 @@
 import asyncio
 import json
+import logging
 import threading
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
+
+logger = logging.getLogger(__name__)
 
 from services.api.src.api.auth import UserDTO, require_role
 from services.api.src.services.preview import (
@@ -212,6 +215,9 @@ async def preview_stream(
                     break
                 record_viewer_activity(line_slug)
                 jpeg_bytes = await asyncio.to_thread(FrameGenerator.generate_jpeg_frame, line_slug, frame_idx)
+                if not jpeg_bytes:
+                    await asyncio.sleep(0.066)
+                    continue
                 yield (
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n\r\n" + jpeg_bytes + b"\r\n"
@@ -220,6 +226,8 @@ async def preview_stream(
                 await asyncio.sleep(0.066)  # ~15 fps
         except asyncio.CancelledError:
             pass
+        except Exception:
+            logger.exception("Error during live preview streaming for %s", line_slug)
 
     return StreamingResponse(
         frame_stream(),

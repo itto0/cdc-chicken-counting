@@ -198,3 +198,26 @@ def test_real_video_preview_bounding_box_colors():
     assert img[260, 450][2] < 50
 
 
+def test_generate_jpeg_frame_never_returns_none_when_no_live_and_no_video():
+    """Ensure generate_jpeg_frame returns a valid synthetic frame even if no live frames and no video."""
+    with patch("services.api.src.services.preview.get_live_frame", return_value=None), \
+         patch.object(FrameGenerator, "_resolve_video_path", return_value=None):
+        frame = FrameGenerator.generate_jpeg_frame("line-fallback", 0)
+        assert isinstance(frame, bytes)
+        assert len(frame) > 0
+        assert frame.startswith(b"\xff\xd8")
+        assert frame.endswith(b"\xff\xd9")
+
+
+def test_preview_stream_handles_none_frame_gracefully():
+    """Ensure preview stream does not raise TypeError or abort prematurely if a frame is None."""
+    with patch.object(FrameGenerator, "generate_jpeg_frame", side_effect=[None, b"\xff\xd8fakejpeg\xff\xd9"]):
+        with TestClient(app) as client:
+            with client.stream("GET", "/api/v1/lines/line-1/preview?max_frames=1") as response:
+                assert response.status_code == 200
+                content = b"".join(response.iter_bytes())
+                assert b"--frame\r\n" in content
+                assert b"\xff\xd8fakejpeg\xff\xd9" in content
+
+
+

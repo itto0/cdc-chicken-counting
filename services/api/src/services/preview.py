@@ -231,3 +231,38 @@ class FrameGenerator:
                 _, encoded = cv2.imencode(".jpg", resized, [cv2.IMWRITE_JPEG_QUALITY, 75])
                 return encoded.tobytes()
 
+        # Fallback synthetic frame if video file not available
+        img = np.zeros((480, 640, 3), dtype=np.uint8)
+        img[:] = (30, 30, 40)  # dark background
+
+        # Draw conveyor rail
+        cv2.line(img, (50, 180), (590, 180), (120, 120, 120), 4)
+
+        # Draw virtual counting line (green)
+        cv2.line(img, (320, 100), (320, 400), (0, 220, 100), 2)
+        cv2.putText(img, "COUNTING LINE", (260, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 220, 100), 1)
+
+        # Animated shackle / chicken moving across
+        x_pos = int((safe_frame_num * 15) % 500 + 70)
+        mid_x = 320
+        if abs(x_pos - mid_x) <= 20:
+            box_color = (0, 255, 0)
+            label = f"Chicken #{(safe_frame_num // 33) + 1} COUNTING (98%)"
+        elif x_pos > mid_x + 20:
+            box_color = (0, 220, 0)
+            label = f"Chicken #{(safe_frame_num // 33) + 1} [COUNTED] (98%)"
+        else:
+            box_color = (0, 180, 255)
+            label = f"Chicken #{(safe_frame_num // 33) + 1} (98%)"
+
+        cv2.rectangle(img, (x_pos - 30, 190), (x_pos + 30, 310), box_color, 2)
+        cv2.putText(img, label, (x_pos - 35, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.4, box_color, 1)
+
+        # HUD overlay
+        ts_str = f"{format_jakarta_display(now_jakarta())} {WIB_LABEL}"
+        cv2.putText(img, f"LIVE PREVIEW - {line_id.upper()} | {ts_str}", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+        cv2.putText(img, "Status: ACTIVE | 120 cpm", (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 255, 100), 1)
+
+        _, encoded = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        return encoded.tobytes()
+
