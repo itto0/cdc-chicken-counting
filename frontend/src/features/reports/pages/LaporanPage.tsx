@@ -99,60 +99,6 @@ export default function LaporanPage() {
         return timeB - timeA;
       });
 
-      // Only inject fallback sample rows if all requests failed (network error / res === null across all lines).
-      // If the backend successfully responded with empty data (res.aggregates = []), do NOT inject sample rows.
-      const allFailed = results.length > 0 && results.every(({ res }) => res === null);
-      if (allFailed && items.length === 0) {
-        const isAll = selectedLineId === "all";
-        const line1Name = isAll
-          ? "Lini 1 - Utama"
-          : lines.find((l) => l.id === selectedLineId)?.name || selectedLineId;
-        const line2Name = isAll ? "Lini 2 - Pemotongan" : line1Name;
-
-        items.push(
-          {
-            id: "sample-1",
-            timestamp: "17 Okt 2026, 14:00 - 15:00",
-            rawTimestamp: "2026-10-17T14:00:00Z",
-            lineName: line1Name,
-            count: 7120,
-            ratePerMin: 119,
-            accuracyPct: 99.2,
-            status: "Normal",
-          },
-          {
-            id: "sample-2",
-            timestamp: "17 Okt 2026, 13:00 - 14:00",
-            rawTimestamp: "2026-10-17T13:00:00Z",
-            lineName: line1Name,
-            count: 6840,
-            ratePerMin: 114,
-            accuracyPct: 99.1,
-            status: "Normal",
-          },
-          {
-            id: "sample-3",
-            timestamp: "17 Okt 2026, 12:00 - 13:00",
-            rawTimestamp: "2026-10-17T12:00:00Z",
-            lineName: line2Name,
-            count: 7300,
-            ratePerMin: 122,
-            accuracyPct: 99.3,
-            status: "Normal",
-          },
-          {
-            id: "sample-4",
-            timestamp: "17 Okt 2026, 11:00 - 12:00",
-            rawTimestamp: "2026-10-17T11:00:00Z",
-            lineName: line2Name,
-            count: 5950,
-            ratePerMin: 99,
-            accuracyPct: 98.8,
-            status: "Warning",
-          }
-        );
-      }
-
       setRawRows(items);
     });
 
@@ -183,7 +129,7 @@ export default function LaporanPage() {
         : 0;
     const avgAccuracyPct =
       filteredRows.length > 0
-        ? filteredRows.reduce((acc, curr) => acc + (curr.accuracyPct || 99.2), 0) /
+        ? filteredRows.reduce((acc, curr) => acc + (curr.accuracyPct ?? 0), 0) /
           filteredRows.length
         : 0;
     const totalOperationMinutes = filteredRows.length * 60;

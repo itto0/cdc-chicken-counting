@@ -17,6 +17,7 @@ export interface ReportRowItem {
 
 export interface ReportsTableProps {
   data?: (ReportRowItem | AggregateItemDTO)[];
+  emptyMessage?: string;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -34,14 +35,17 @@ function normalizeRow(item: ReportRowItem | AggregateItemDTO, index: number): Re
       lineName: "Lini Utama",
       count: item.count ?? 0,
       ratePerMin: item.rate_per_min ?? 0,
-      accuracyPct: 99.2,
+      accuracyPct: (item as any).accuracy_pct ?? 0,
       status: item.status || "Normal",
     };
   }
   return item;
 }
 
-export function ReportsTable({ data = [] }: ReportsTableProps) {
+export function ReportsTable({
+  data = [],
+  emptyMessage = "Belum ada riwayat data penghitungan untuk filter yang dipilih",
+}: ReportsTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
 
   const normalizedRows = data.map((item, idx) => normalizeRow(item, idx));
@@ -95,7 +99,7 @@ export function ReportsTable({ data = [] }: ReportsTableProps) {
           >
             <Inbox className="w-6 h-6" />
           </div>
-          <p className="text-sm font-medium text-slate-700">Tidak ada data riwayat yang sesuai</p>
+          <p className="text-sm font-medium text-slate-700">{emptyMessage}</p>
           <p className="text-xs text-slate-400 mt-1">Coba ubah filter periode, lini, atau kata kunci pencarian Anda.</p>
         </div>
       ) : (
