@@ -11,6 +11,11 @@ import threading
 import time
 from typing import Any, Optional, Sequence
 
+try:
+    import numpy as np
+except ImportError:
+    np = None  # type: ignore
+
 # Ensure counter root and monorepo root are in sys.path when script is executed directly
 # Add counter root to sys.path, and add monorepo root only if running inside monorepo
 counter_root = Path(__file__).resolve().parent
@@ -71,6 +76,14 @@ except ImportError:
     except ImportError:
         from shared.contracts import CountAggregateDTO, HealthSampleDTO
 
+try:
+    from src.sync.streamer import LiveStreamUploader
+except ImportError:
+    try:
+        from services.counter.src.sync.streamer import LiveStreamUploader
+    except ImportError:
+        LiveStreamUploader = None
+
 logger = logging.getLogger("counter.service")
 
 
@@ -100,6 +113,9 @@ class CounterService:
         enable_sync: bool = True,
         cli_display: bool = True,
         show_window: bool = False,
+        enable_stream_relay: bool = True,
+        stream_fps: float = 4.0,
+        stream_uploader: Optional[Any] = None,
     ) -> None:
         self.line_id = line_id
         self.video_source_type = video_source_type.lower()
@@ -117,6 +133,21 @@ class CounterService:
         self.enable_sync = enable_sync
         self.cli_display = cli_display
         self.show_window = show_window
+        self.enable_stream_relay = enable_stream_relay
+        self.stream_fps = stream_fps
+        self.stream_uploader = stream_uploader
+
+        if self.stream_uploader is None and self.enable_stream_relay and LiveStreamUploader is not None:
+            if self.api_sync_url and "/api/v1" in self.api_sync_url:
+                base_api = self.api_sync_url.split("/api/v1")[0].rstrip("/")
+            else:
+                base_api = "http://localhost:8000"
+            api_frame_url = f"{base_api}/api/v1/lines/{self.line_id}/frame"
+            self.stream_uploader = LiveStreamUploader(
+                api_frame_url=api_frame_url,
+                api_token=self.api_token,
+                target_fps=self.stream_fps,
+            )
 
         self.running = False
         self.total_frames_processed = 0
@@ -317,6 +348,11 @@ class CounterService:
         """Signal the pipeline loop and background sync worker to stop."""
         self.running = False
         self._stop_event.set()
+        if self.stream_uploader is not None:
+            try:
+                self.stream_uploader.stop()
+            except Exception as e:
+                logger.warning("Error stopping stream uploader: %s", e)
 
     def run(self, max_frames: Optional[int] = None) -> int:
         """Run the counting pipeline loop: Capture -> Detect -> Track/Count -> LocalStorage.
@@ -343,6 +379,10 @@ class CounterService:
                     name=f"SyncWorker-{self.line_id}",
                 )
                 self._sync_thread.start()
+
+        # Start live stream uploader if enabled
+        if self.stream_uploader is not None:
+            self.stream_uploader.start()
 
         self.source.start()
 
@@ -443,6 +483,12 @@ class CounterService:
                         self.line_id,
                     )
 
+                # On-demand live video streaming relay
+                if self.stream_uploader is not None and getattr(self.dispatcher, "stream_requested", False):
+                    vis_frame = self.render_annotated_frame(frame, detections, events)
+                    if vis_frame is not None:
+                        self.stream_uploader.submit_frame(vis_frame)
+
                 # Optional visual preview window
                 if self.show_window:
                     self._render_window_frame(frame, detections, events)
@@ -494,15 +540,15 @@ class CounterService:
 
         return self.counter.total_count
 
-    def _render_window_frame(
+    def render_annotated_frame(
         self, frame: object, detections: list, events: list
-    ) -> Optional[object]:
-        """Render annotations on frame and show in an OpenCV window."""
+    ) -> Optional[np.ndarray]:
+        """Render annotations on frame returning the annotated numpy ndarray."""
         try:
             import cv2
             import numpy as np
 
-            if not isinstance(frame, np.ndarray):
+            if not isinstance(frame, np.ndarray) or frame.size == 0 or frame.ndim < 2:
                 return None
             vis = frame.copy()
             h, w = vis.shape[:2]
@@ -604,7 +650,22 @@ class CounterService:
             cv2.rectangle(vis, (10, 10), (min(w - 10, 560), 45), (0, 0, 0), -1)
             cv2.putText(vis, hud_text, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
-            win_name = f"Chicken Counter - {self.line_id}"
+            return vis
+        except Exception as e:
+            logger.debug("Error in visual rendering: %s", e)
+            return None
+
+    def _render_window_frame(
+        self, frame: object, detections: list, events: list
+    ) -> Optional[object]:
+        """Render annotations on frame and show in an OpenCV window."""
+        vis = self.render_annotated_frame(frame, detections, events)
+        if vis is None:
+            return None
+        try:
+            import cv2
+            h, w = vis.shape[:2]
+            win_name = "Chicken Counter - Edge Inspection"
             cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
             if w > 1280:
                 cv2.resizeWindow(win_name, 1280, int(1280 * (h / w)))
@@ -632,6 +693,11 @@ class CounterService:
         end_pt = self.counter.line_zone.end
         direction = self.counter.line_zone.direction
         sync_desc = f"ENABLED ({self.api_sync_url})" if self.enable_sync else "DISABLED (Standalone CLI mode)"
+        stream_desc = (
+            f"ENABLED ({self.stream_fps:.1f} FPS target)"
+            if (self.enable_stream_relay and self.stream_uploader is not None)
+            else "DISABLED"
+        )
 
         print("\n" + "=" * 74)
         print("          POULTRY COUNTING SYSTEM - EDGE COUNTER SERVICE")
@@ -641,6 +707,7 @@ class CounterService:
         print(f"  Detector:        {det_name}")
         print(f"  Virtual Line:    ({start_pt[0]:.1f}, {start_pt[1]:.1f}) -> ({end_pt[0]:.1f}, {end_pt[1]:.1f}) [{direction}]")
         print(f"  API Sync:        {sync_desc}")
+        print(f"  Stream Relay:    {stream_desc}")
         print(f"  Outbox Database: {self.db_path}")
         print("=" * 74)
         print("Processing video stream... Press Ctrl+C to stop.\n")
@@ -690,6 +757,12 @@ class CounterService:
         self.running = False
         self._stop_event.set()
 
+        if self.stream_uploader is not None:
+            try:
+                self.stream_uploader.stop()
+            except Exception as e:
+                logger.warning("Error stopping stream uploader during cleanup: %s", e)
+
         try:
             self.source.stop()
         except Exception as e:
@@ -738,8 +811,8 @@ class CounterService:
             )
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    """Parse command line arguments with environment variable fallbacks."""
+def build_arg_parser() -> argparse.ArgumentParser:
+    """Build command line argument parser for edge counter service."""
     parser = argparse.ArgumentParser(
         description="Edge Poultry Counter Service - Process real video and count chickens in CLI"
     )
@@ -877,6 +950,25 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="Open an OpenCV visual preview window showing detections and line crossing",
     )
     parser.add_argument(
+        "--enable-stream-relay",
+        dest="enable_stream_relay",
+        action="store_true",
+        default=os.getenv("ENABLE_STREAM_RELAY", "1").lower() in ("1", "true", "yes"),
+        help="Enable on-demand live video streaming relay to central API (default: True)",
+    )
+    parser.add_argument(
+        "--no-stream-relay",
+        dest="enable_stream_relay",
+        action="store_false",
+        help="Disable on-demand live video streaming relay",
+    )
+    parser.add_argument(
+        "--stream-fps",
+        type=float,
+        default=float(os.getenv("STREAM_FPS", "4.0")),
+        help="Target frame rate for live streaming relay (default: 4.0)",
+    )
+    parser.add_argument(
         "--sync-interval",
         type=float,
         default=float(os.getenv("SYNC_INTERVAL_SEC", "5.0")),
@@ -902,6 +994,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="Enable verbose DEBUG logging",
     )
 
+    return parser
+
+
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    """Parse command line arguments with environment variable fallbacks."""
+    parser = build_arg_parser()
     if argv is None:
         # If running inside pytest or non-cli environment without explicit argv, don't parse sys.argv
         if any("pytest" in str(arg) for arg in sys.argv):
@@ -1063,6 +1161,8 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         enable_sync=enable_sync,
         cli_display=True,
         show_window=args.show_window,
+        enable_stream_relay=args.enable_stream_relay,
+        stream_fps=args.stream_fps,
     )
 
     def handle_shutdown(signum: int, frame: object) -> None:
