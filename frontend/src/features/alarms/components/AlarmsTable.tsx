@@ -13,7 +13,7 @@ export function AlarmsTable({ alarms, onAcknowledge, onResolve }: AlarmsTablePro
   if (alarms.length === 0) {
     return (
       <div className="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-500 text-sm">
-        Tidak ada alarm aktif untuk lini ini.
+        Tidak ada data alarm yang tercatat
       </div>
     );
   }

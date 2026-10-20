@@ -20,20 +20,7 @@ export default function AlarmPage() {
       })
       .catch(() => {
         if (isCurrent) {
-          // fallback sample
-          setAlarms([
-            {
-              id: 1,
-              line_id: currentLineId,
-              alarm_type: "LOW_SPEED",
-              severity: "MEDIUM",
-              message: "Kecepatan di bawah target (84 cpm < 120 cpm)",
-              status: "ACTIVE",
-              opened_at: new Date().toISOString(),
-              ack_at: null,
-              resolved_at: null,
-            },
-          ]);
+          setAlarms([]);
         }
       });
 
