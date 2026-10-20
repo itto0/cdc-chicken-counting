@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from io import BytesIO
 import re
 from typing import Any
@@ -6,7 +6,7 @@ import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-WIB_TZ = timezone(timedelta(hours=7))
+from shared.time_utils import JAKARTA_TZ, to_jakarta, format_jakarta_display, WIB_LABEL
 
 
 class ExcelReportGenerator:
@@ -22,11 +22,14 @@ class ExcelReportGenerator:
 
     def _format_timestamp(self, ts_val: Any) -> str:
         if isinstance(ts_val, datetime):
-            if ts_val.tzinfo is None:
-                # Stored as naive UTC
-                ts_val = ts_val.replace(tzinfo=timezone.utc)
-            wib_dt = ts_val.astimezone(WIB_TZ)
-            return wib_dt.strftime("%Y-%m-%d %H:%M:%S")
+            return format_jakarta_display(ts_val)
+        if isinstance(ts_val, str) and ("T" in ts_val or ts_val.endswith("Z")):
+            try:
+                clean_ts = ts_val.strip().replace("Z", "+00:00")
+                dt = datetime.fromisoformat(clean_ts)
+                return format_jakarta_display(dt)
+            except Exception:
+                return str(ts_val)
         if ts_val is not None:
             return str(ts_val)
         return ""

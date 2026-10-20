@@ -219,13 +219,13 @@ def test_pdf_report_generator_multiline_column_layout():
     tables_1 = [e for e in elements_multi_1 if isinstance(e, Table)]
     assert len(tables_1) == 2
     records_table_1 = tables_1[1]
-    assert records_table_1._cellvalues[0] == ["Interval Start", "Line", "Count", "Speed (cpm)", "Status"]
+    assert records_table_1._cellvalues[0] == ["Interval Start (WIB)", "Line", "Count", "Speed (cpm)", "Status"]
     assert records_table_1._argW == [120, 90, 80, 90, 80]
 
     # 2. Multi-line via line_id="all"
     elements_multi_2 = generator._build_elements("all", [])
     tables_2 = [e for e in elements_multi_2 if isinstance(e, Table)]
-    assert tables_2[1]._cellvalues[0] == ["Interval Start", "Line", "Count", "Speed (cpm)", "Status"]
+    assert tables_2[1]._cellvalues[0] == ["Interval Start (WIB)", "Line", "Count", "Speed (cpm)", "Status"]
     assert tables_2[1]._argW == [120, 90, 80, 90, 80]
 
     # 3. Multi-line via records having line_id
@@ -234,7 +234,7 @@ def test_pdf_report_generator_multiline_column_layout():
     ]
     elements_multi_3 = generator._build_elements("line-custom", records_with_line)
     tables_3 = [e for e in elements_multi_3 if isinstance(e, Table)]
-    assert tables_3[1]._cellvalues[0] == ["Interval Start", "Line", "Count", "Speed (cpm)", "Status"]
+    assert tables_3[1]._cellvalues[0] == ["Interval Start (WIB)", "Line", "Count", "Speed (cpm)", "Status"]
     assert tables_3[1]._cellvalues[1] == ["2026-10-17 10:00", "line-2", "50", "50.0", "NORMAL"]
     assert tables_3[1]._argW == [120, 90, 80, 90, 80]
 
@@ -244,7 +244,7 @@ def test_pdf_report_generator_multiline_column_layout():
     ]
     elements_single = generator._build_elements("line-1", records_single)
     tables_single = [e for e in elements_single if isinstance(e, Table)]
-    assert tables_single[1]._cellvalues[0] == ["Interval Start", "Count", "Speed (cpm)", "Status"]
+    assert tables_single[1]._cellvalues[0] == ["Interval Start (WIB)", "Count", "Speed (cpm)", "Status"]
     assert tables_single[1]._cellvalues[1] == ["2026-10-17 10:00", "50", "50.0", "NORMAL"]
     assert tables_single[1]._argW == [180, 100, 120, 100]
 

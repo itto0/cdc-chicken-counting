@@ -7,6 +7,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from shared.time_utils import now_jakarta, to_jakarta, format_jakarta_display, WIB_LABEL
+
 
 class PDFReportGenerator:
     def _build_elements(
@@ -29,7 +31,7 @@ class PDFReportGenerator:
         escaped_line_id = html.escape(str(line_id))
         elements.append(
             Paragraph(
-                f"Line ID: <b>{escaped_line_id}</b> | Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                f"Line ID: <b>{escaped_line_id}</b> | Generated at: {format_jakarta_display(now_jakarta())} {WIB_LABEL}",
                 styles["Normal"],
             )
         )
@@ -71,16 +73,23 @@ class PDFReportGenerator:
 
         # Details Table
         if is_multi_line:
-            table_data = [["Interval Start", "Line", "Count", "Speed (cpm)", "Status"]]
+            table_data = [["Interval Start (WIB)", "Line", "Count", "Speed (cpm)", "Status"]]
             col_widths = [120, 90, 80, 90, 80]
         else:
-            table_data = [["Interval Start", "Count", "Speed (cpm)", "Status"]]
+            table_data = [["Interval Start (WIB)", "Count", "Speed (cpm)", "Status"]]
             col_widths = [180, 100, 120, 100]
 
         for r in records[:50]:  # limit for PDF layout
             ws = r.get("window_start")
-            if hasattr(ws, "strftime"):
-                ws_str = ws.strftime("%Y-%m-%d %H:%M")
+            if isinstance(ws, datetime):
+                ws_str = format_jakarta_display(ws, "%Y-%m-%d %H:%M")
+            elif isinstance(ws, str) and ("T" in ws or ws.endswith("Z")):
+                try:
+                    clean_ws = ws.strip().replace("Z", "+00:00")
+                    dt_ws = datetime.fromisoformat(clean_ws)
+                    ws_str = format_jakarta_display(dt_ws, "%Y-%m-%d %H:%M")
+                except Exception:
+                    ws_str = str(ws)
             elif ws is not None:
                 ws_str = str(ws)
             else:
