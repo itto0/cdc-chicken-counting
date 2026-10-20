@@ -40,6 +40,7 @@ class OutboxSyncDispatcher:
         self.backoff_sec = 1.0
         self.max_backoff_sec = max_backoff_sec
         self.api_token = api_token
+        self.stream_requested: bool = False
 
     def sync_once(self) -> int:
         """
@@ -76,6 +77,13 @@ class OutboxSyncDispatcher:
                 **req_kwargs,
             )
             if resp.status_code in (200, 201):
+                try:
+                    data = resp.json()
+                    if isinstance(data, dict) and "stream_requested" in data:
+                        self.stream_requested = bool(data.get("stream_requested", False))
+                except Exception:
+                    pass
+
                 if event_ids:
                     self.storage.mark_events_synced(event_ids)
                 if aggregate_ids:
