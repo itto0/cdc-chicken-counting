@@ -23,11 +23,15 @@ export function KpiCards({ summary }: KpiCardsProps) {
     ? "Degraded"
     : "Offline";
 
-  const accuracy = summary.detection_accuracy_pct ?? 99.2;
-  const formattedAccuracy = accuracy.toLocaleString("id-ID", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  });
+  const accuracy = summary.detection_accuracy_pct;
+  const hasAccuracy =
+    (summary.total_count ?? 0) > 0 && accuracy != null && accuracy > 0;
+  const formattedAccuracy = hasAccuracy
+    ? `${accuracy.toLocaleString("id-ID", {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      })}%`
+    : "-";
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -64,7 +68,7 @@ export function KpiCards({ summary }: KpiCardsProps) {
             <p className="text-xs font-normal text-slate-500">Laju Rata-rata</p>
             <div className="flex items-baseline gap-1.5 mt-2">
               <span className="text-2xl font-bold tracking-tight text-slate-900">
-                {Math.round(summary.current_speed_cpm ?? 120).toLocaleString("id-ID")}
+                {Math.round(summary.current_speed_cpm ?? 0).toLocaleString("id-ID")}
               </span>
               <span className="text-xs font-semibold text-slate-700">ekor/menit</span>
             </div>
@@ -100,7 +104,7 @@ export function KpiCards({ summary }: KpiCardsProps) {
             <p className="text-xs font-normal text-slate-500">Akurasi Deteksi</p>
             <div className="mt-2">
               <span className="text-2xl font-bold tracking-tight text-slate-900">
-                {formattedAccuracy}%
+                {formattedAccuracy}
               </span>
             </div>
           </div>

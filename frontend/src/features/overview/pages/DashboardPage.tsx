@@ -23,7 +23,7 @@ const FALLBACK_SUMMARY: LineSummaryResponse = {
   last_event_time: null,
   fps: 0.0,
   latency_p95_ms: 0.0,
-  detection_accuracy_pct: 99.2,
+  detection_accuracy_pct: 0.0,
 };
 
 export default function DashboardPage() {
