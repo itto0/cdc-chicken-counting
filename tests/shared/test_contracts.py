@@ -138,3 +138,11 @@ def test_validation_constraints():
             message="bad",
             ts_utc=now,
         )
+
+
+def test_contracts_independent_of_counter_service():
+    import sys
+    import shared.contracts
+    counter_modules = [m for m in sys.modules if m.startswith("services.counter")]
+    assert counter_modules == [], f"shared.contracts leaked counter dependencies: {counter_modules}"
+
