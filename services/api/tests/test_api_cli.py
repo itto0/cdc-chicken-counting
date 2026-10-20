@@ -17,7 +17,7 @@ def test_cli_create_api_key():
         "--role",
         "OPERATOR",
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    res = subprocess.run(cmd, capture_output=True, text=True, check=True, stdin=subprocess.DEVNULL)
     output = res.stdout
     assert "cdc_live_" in output
     assert "API Key created successfully" in output
@@ -32,7 +32,7 @@ def test_cli_create_api_key_default_role():
         "--name",
         "CLI Default Role Key",
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    res = subprocess.run(cmd, capture_output=True, text=True, check=True, stdin=subprocess.DEVNULL)
     output = res.stdout
     assert "cdc_live_" in output
     assert "API Key created successfully for 'CLI Default Role Key' [OPERATOR]" in output
@@ -49,7 +49,7 @@ def test_cli_create_api_key_admin_role():
         "--role",
         "ADMIN",
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    res = subprocess.run(cmd, capture_output=True, text=True, check=True, stdin=subprocess.DEVNULL)
     output = res.stdout
     assert "cdc_live_" in output
     assert "API Key created successfully for 'CLI Admin Role Key' [ADMIN]" in output
@@ -66,7 +66,7 @@ def test_cli_create_api_key_lowercase_role():
         "--role",
         "operator",
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    res = subprocess.run(cmd, capture_output=True, text=True, check=True, stdin=subprocess.DEVNULL)
     output = res.stdout
     assert "cdc_live_" in output
     assert "API Key created successfully for 'CLI Lowercase Role Key' [OPERATOR]" in output
@@ -80,7 +80,7 @@ def test_cli_missing_name_fails():
         "services.api.src.cli",
         "create-api-key",
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    res = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)
     assert res.returncode != 0
     assert "required" in res.stderr.lower() or "--name" in res.stderr.lower()
 
@@ -96,7 +96,7 @@ def test_cli_invalid_role_fails():
         "--role",
         "SUPERUSER",
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    res = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)
     assert res.returncode != 0
     assert "invalid choice" in res.stderr.lower() or "error" in res.stderr.lower()
 

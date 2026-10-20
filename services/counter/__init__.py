@@ -1,1 +1,0 @@
-"""Counter service package."""
