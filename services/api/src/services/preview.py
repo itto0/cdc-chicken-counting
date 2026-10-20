@@ -5,6 +5,8 @@ from datetime import datetime
 import cv2
 import numpy as np
 
+from shared.time_utils import now_jakarta, format_jakarta_display, WIB_LABEL
+
 _relay_lock = threading.Lock()
 _active_viewers: dict[str, float] = {}
 _latest_frames: dict[str, tuple[bytes, float]] = {}
@@ -206,7 +208,7 @@ class FrameGenerator:
                 cv2.line(resized, (20, 115), (620, 115), (80, 180, 255), 1)
 
                 # HUD overlay
-                ts_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ts_str = f"{format_jakarta_display(now_jakarta())} {WIB_LABEL}"
                 cv2.putText(
                     resized,
                     f"LIVE FEED - {line_id.upper()} | {ts_str}",
@@ -257,7 +259,7 @@ class FrameGenerator:
         cv2.putText(img, label, (x_pos - 35, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.4, box_color, 1)
 
         # HUD overlay
-        ts_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ts_str = f"{format_jakarta_display(now_jakarta())} {WIB_LABEL}"
         cv2.putText(img, f"LIVE PREVIEW - {line_id.upper()} | {ts_str}", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
         cv2.putText(img, "Status: ACTIVE | 120 cpm", (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 255, 100), 1)
 
