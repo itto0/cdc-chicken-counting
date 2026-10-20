@@ -61,6 +61,12 @@ class LiveStreamUploader:
         )
         self._thread.start()
 
+    def is_ready(self) -> bool:
+        """Check if the uploader is running and ready to accept a new frame based on target FPS interval."""
+        if self._stop_event.is_set():
+            return False
+        return (time.time() - self._last_submit_time) >= self.min_frame_interval_sec
+
     def submit_frame(self, frame: np.ndarray) -> bool:
         """
         Submit a new camera frame for asynchronous compression and upload.

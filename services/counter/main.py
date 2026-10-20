@@ -484,14 +484,20 @@ class CounterService:
                     )
 
                 # On-demand live video streaming relay
-                if self.stream_uploader is not None and getattr(self.dispatcher, "stream_requested", False):
+                vis_frame = None
+                is_uploader_ready = (
+                    self.stream_uploader is not None
+                    and getattr(self.dispatcher, "stream_requested", False)
+                    and getattr(self.stream_uploader, "is_ready", lambda: True)()
+                )
+                if is_uploader_ready:
                     vis_frame = self.render_annotated_frame(frame, detections, events)
                     if vis_frame is not None:
                         self.stream_uploader.submit_frame(vis_frame)
 
                 # Optional visual preview window
                 if self.show_window:
-                    self._render_window_frame(frame, detections, events)
+                    self._render_window_frame(frame, detections, events, vis=vis_frame)
                     try:
                         import cv2
                         if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -656,10 +662,15 @@ class CounterService:
             return None
 
     def _render_window_frame(
-        self, frame: object, detections: list, events: list
+        self,
+        frame: object,
+        detections: list,
+        events: list,
+        vis: Optional[object] = None,
     ) -> Optional[object]:
         """Render annotations on frame and show in an OpenCV window."""
-        vis = self.render_annotated_frame(frame, detections, events)
+        if vis is None:
+            vis = self.render_annotated_frame(frame, detections, events)
         if vis is None:
             return None
         try:

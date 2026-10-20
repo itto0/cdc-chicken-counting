@@ -196,7 +196,8 @@ async def preview_stream(
     max_frames: int | None = Query(default=None, ge=0, description="Max frames to yield before closing"),
 ):
     """MJPEG live preview stream delivering synthetic annotated camera feed."""
-    if not line_id or not line_id.strip():
+    line_slug = line_id.strip()
+    if not line_slug:
         raise HTTPException(status_code=400, detail="Invalid line_id")
 
     limit_frames = max_frames if isinstance(max_frames, int) else None
@@ -209,8 +210,8 @@ async def preview_stream(
                     break
                 if await request.is_disconnected():
                     break
-                record_viewer_activity(line_id)
-                jpeg_bytes = await asyncio.to_thread(FrameGenerator.generate_jpeg_frame, line_id, frame_idx)
+                record_viewer_activity(line_slug)
+                jpeg_bytes = await asyncio.to_thread(FrameGenerator.generate_jpeg_frame, line_slug, frame_idx)
                 yield (
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n\r\n" + jpeg_bytes + b"\r\n"
@@ -251,6 +252,17 @@ async def upload_frame(
                     status_code=403,
                     detail=f"Token not authorized for this line (authorized: '{allowed_line}')",
                 )
+
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > 1024 * 1024:
+                raise HTTPException(
+                    status_code=413,
+                    detail="Frame exceeds maximum size limit of 1048576 bytes",
+                )
+        except ValueError:
+            pass
 
     body = await request.body()
     if not body:
