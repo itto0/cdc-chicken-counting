@@ -9,16 +9,15 @@ This guide provides complete, step-by-step instructions for deploying the **Poul
 1. [Architecture Overview](#1-architecture-overview)
 2. [Option A: 1-Click Blueprint Deployment (`render.yaml`)](#2-option-a-1-click-blueprint-deployment-renderyaml)
 3. [Option B: Manual Dashboard Setup](#3-option-b-manual-dashboard-setup)
-4. [Edge Node Configuration (`services/counter`)](#4-edge-node-configuration-servicescounter)
-5. [Initial Login & Default Credentials](#5-initial-login--default-credentials)
-6. [Production & Free Tier Notes](#6-production--free-tier-notes)
-7. [Troubleshooting & Verification](#7-troubleshooting--verification)
+4. [Initial Login & Default Credentials](#4-initial-login--default-credentials)
+5. [Production & Free Tier Notes](#5-production--free-tier-notes)
+6. [Troubleshooting & Verification](#6-troubleshooting--verification)
 
 ---
 
 ## 1. Architecture Overview
 
-The Poultry Counter platform is composed of four main components operating across cloud hosting and on-premise industrial edge nodes:
+The Poultry Counter platform cloud infrastructure is composed of three main services operating on Render cloud hosting, receiving sync data from external edge nodes or camera counting systems:
 
 ```
 +-----------------------------------------------------------------------------------+
@@ -44,28 +43,12 @@ The Poultry Counter platform is composed of four main components operating acros
                                              HTTPS POST Batches  |
                                              /api/v1/sync/batch  |
                                                                  |
-                               +---------------------------------+
-                               |
-+------------------------------|----------------------------------------------------+
-| ON-PREMISE EDGE FACILITY     |                                                    |
-|                              |                                                    |
-|    +-------------------------+----+                                               |
-|    |        services/counter      |                                               |
-|    |  OutboxSyncDispatcher Worker |                                               |
-|    +-------------------------+----+                                               |
-|                              ^                                                    |
-|                              | Ingests & Drains                                   |
-|                              v                                                    |
-|    +------------------------------+     Count Events      +------------------+    |
-|    |    Local SQLite Outbox DB    | <-------------------- |  Inference Engine|    |
-|    |     (counter_outbox.db)      |                       | (YOLO / Shackle) |    |
-|    +------------------------------+                       +------------------+    |
-|                                                                     ^             |
-|                                                                     | Video Frame |
-|                                                           +------------------+    |
-|                                                           | RTSP Camera Feed |    |
-|                                                           | Conveyor Shackle |    |
-|                                                           +------------------+    |
+                                +--------------------------------+
+                                |
++-------------------------------+---------------------------------------------------+
+| EXTERNAL EDGE NODES / CAMERA COUNTING SYSTEMS                                     |
+| Autonomous edge counter gateways, RTSP cameras, or local vision pipelines         |
+| pushing count batches and health samples upstream over HTTPS.                     |
 +-----------------------------------------------------------------------------------+
 ```
 
@@ -76,7 +59,6 @@ The Poultry Counter platform is composed of four main components operating acros
 | **`cdc-postgres`** | Managed PostgreSQL | Managed Database | Stores system configuration, lines, user authentication, raw count events, aggregations, and alarms. |
 | **`cdc-api`** | Web Service (`docker`) | `./services/api/Dockerfile` | Central FastAPI backend serving REST API, WebSockets, JWT authentication, and edge sync batch ingestion. |
 | **`cdc-frontend`** | Static Site (`static`) | `frontend/` (`dist/`) | High-performance React 18 / Vite single-page application hosted globally on Render's CDN. |
-| **`services/counter`** | On-premise Edge Node | `services/counter/` | Runs on edge hardware at the conveyor line. Detects carcasses via computer vision and syncs batches over HTTPS. |
 
 ---
 
@@ -193,94 +175,7 @@ If you prefer provisioning each component manually through the Render Dashboard 
 
 ---
 
-## 4. Edge Node Configuration (`services/counter`)
-
-Edge counter nodes run on-premise near the conveyor line and do not require inbound public IP addresses or firewall port forwarding. They only require outbound HTTPS access to your Render API.
-
-### Endpoint Structure
-
-The sync worker targets the `/api/v1/sync/batch` endpoint:
-```
-https://<cdc-api-subdomain>.onrender.com/api/v1/sync/batch
-```
-
-### Method 1: Environment File (`.env`)
-
-On the edge device, create or edit `.env` in the project root:
-
-```ini
-# --- Conveyor Line Identity ---
-LINE_ID=lineA
-
-# --- Cloud Central API Endpoint ---
-API_SYNC_URL=https://<cdc-api-subdomain>.onrender.com/api/v1/sync/batch
-SYNC_INTERVAL_SEC=5.0
-
-# --- Video Source Configuration ---
-VIDEO_SOURCE_TYPE=rtsp
-VIDEO_PATH=rtsp://192.168.1.100:554/stream1
-
-# --- Detection Pipeline ---
-DETECTOR_TYPE=shackle
-CONF_THRESHOLD=0.7
-```
-
-Run the counter service:
-```bash
-python -m services.counter.main
-```
-
----
-
-### Method 2: CLI Arguments
-
-You can pass the sync target and camera options directly via command-line arguments:
-
-```bash
-python -m services.counter.main \
-  --line-id lineA \
-  --source rtsp \
-  --video rtsp://admin:password@192.168.1.100:554/h264Preview_01_main \
-  --detector shackle \
-  --api-sync-url https://<cdc-api-subdomain>.onrender.com/api/v1/sync/batch \
-  --sync-interval 5.0
-```
-
----
-
-### Method 3: Edge Docker Container
-
-If running the counter inside Docker at the facility:
-
-```bash
-docker run -d \
-  --name cdc-counter-line-a \
-  --restart unless-stopped \
-  -e LINE_ID=lineA \
-  -e API_SYNC_URL=https://<cdc-api-subdomain>.onrender.com/api/v1/sync/batch \
-  -e SYNC_INTERVAL_SEC=5.0 \
-  -e VIDEO_SOURCE_TYPE=rtsp \
-  -e VIDEO_PATH="rtsp://192.168.1.100:554/stream1" \
-  -v $(pwd)/data:/app/data \
-  cdc-counter:latest
-```
-
----
-
-### Outbox Resilience & Offline Behavior
-
-The edge service is designed for industrial fault tolerance:
-1. **Local SQLite Persistence**: Every detection event is written immediately to `counter_outbox.db`.
-2. **Background Dispatcher**: `OutboxSyncDispatcher` reads batches of unacknowledged records and posts them to `API_SYNC_URL`.
-3. **Automatic Backoff & Reconnection**: If the internet connection is disrupted or Render is waking from sleep, counts are **never lost**. The worker backs off exponentially (up to 30s) and automatically flushes accumulated batches when the connection is restored.
-4. **Log Verification**: On successful sync, the edge terminal logs:
-   ```text
-   Synced 48 items to cloud API (lineA)
-   ```
-
----
-
-## 5. Initial Login & Default Credentials
+## 4. Initial Login & Default Credentials
 
 When `cdc-api` runs for the first time, its database migration and seeding routine automatically initializes tables and creates default user accounts.
 
@@ -307,7 +202,7 @@ You can test endpoints, inspect schemas, and verify authentication tokens direct
 
 ---
 
-## 6. Production & Free Tier Notes
+## 5. Production & Free Tier Notes
 
 ### Understanding Render Free Tier Behavior
 
@@ -356,7 +251,7 @@ If you wish to keep the backend warm on the Free tier during pilot evaluation:
 
 ---
 
-## 7. Troubleshooting & Verification
+## 6. Troubleshooting & Verification
 
 ### Checklist: Verifying Your Deployment
 
@@ -395,9 +290,9 @@ If you wish to keep the backend warm on the Free tier during pilot evaluation:
   1. Ensure you used the **Internal Database URL** provided by Render PostgreSQL (not the External URL).
   2. The code in `services/api/src/db/session.py` automatically normalizes `postgres://` to `postgresql://` and selects the `psycopg2` / `psycopg` driver. If providing a custom URL manually, ensure it uses `postgresql://` or `postgresql+psycopg2://`.
 
-#### Problem 4: Edge counter logs `httpx.ConnectTimeout`
+#### Problem 4: External edge client logs connection timeout / retries
 * **Cause**: The cloud backend on Free tier is cold-starting (~50s).
-* **Solution**: No action needed. The edge outbox dispatcher will hold count events in SQLite and automatically retry with exponential backoff until the backend wakes up.
+* **Solution**: No action needed. External edge clients or camera nodes will hold count events locally and automatically retry with exponential backoff until the backend wakes up.
 
 #### Problem 5: Checking Logs in Render
 * To view live stdout/stderr streams for troubleshooting:
