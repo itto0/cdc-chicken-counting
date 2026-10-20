@@ -2,10 +2,15 @@ import asyncio
 import json
 import threading
 from typing import Any
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 
-from services.api.src.services.preview import FrameGenerator, record_viewer_activity
+from services.api.src.api.auth import UserDTO, require_role
+from services.api.src.services.preview import (
+    FrameGenerator,
+    record_viewer_activity,
+    store_live_frame,
+)
 
 router = APIRouter(prefix="/api/v1/lines", tags=["live"])
 
@@ -224,4 +229,46 @@ async def preview_stream(
             "Expires": "0",
         },
     )
+
+
+@router.post("/{line_id}/frame", status_code=status.HTTP_204_NO_CONTENT)
+async def upload_frame(
+    line_id: str,
+    request: Request,
+    current_user: UserDTO = Depends(require_role(["operator", "admin"])),
+):
+    """Ingest uploaded JPEG frame from edge device or authorized operator/admin."""
+    line_slug = line_id.strip()
+    if not line_slug:
+        raise HTTPException(status_code=400, detail="Invalid line_id")
+
+    user_role = (current_user.role or "").lower()
+    if user_role != "admin":
+        if current_user.username.startswith("device:"):
+            allowed_line = current_user.username[len("device:"):]
+            if allowed_line != line_slug:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Token not authorized for this line (authorized: '{allowed_line}')",
+                )
+
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=400, detail="Empty frame body")
+
+    if len(body) > 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail="Frame exceeds maximum size limit of 1048576 bytes",
+        )
+
+    if len(body) < 4 or not body.startswith(b"\xff\xd8"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid image format: must be JPEG (SOI marker missing)",
+        )
+
+    store_live_frame(line_slug, body)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 
