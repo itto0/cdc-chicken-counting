@@ -417,4 +417,62 @@ def test_render_window_frame_invalid_frame(tmp_path):
     assert service._render_window_frame("not_a_frame", detections=[], events=[]) is None
 
 
+def test_counter_service_geometry_mismatch_correction_horizontal_to_vertical():
+    """Verify CounterService detects horizontal line coords with right/left direction and auto-corrects to vertical."""
+    service = CounterService(
+        line_id="lineGeo",
+        video_source_type="synthetic",
+        line_coords=(0.0, 240.0, 640.0, 240.0),
+        line_direction="right",
+    )
+    # Since coords were horizontal but direction is right, it must be auto-corrected to vertical
+    assert service.counter.line_zone.start[0] == service.counter.line_zone.end[0]
+    assert service._custom_line_set is False
+
+
+def test_counter_service_geometry_mismatch_correction_vertical_to_horizontal():
+    """Verify CounterService detects vertical line coords with down/up direction and auto-corrects to horizontal."""
+    service = CounterService(
+        line_id="lineGeo",
+        video_source_type="synthetic",
+        line_coords=(320.0, 50.0, 320.0, 430.0),
+        line_direction="down",
+    )
+    # Since coords were vertical but direction is down, it must be auto-corrected to horizontal
+    assert service.counter.line_zone.start[1] == service.counter.line_zone.end[1]
+    assert service._custom_line_set is False
+
+
+def test_counter_service_valid_custom_line_preserved():
+    """Verify valid custom line coords matching direction are preserved."""
+    service = CounterService(
+        line_id="lineGeo",
+        video_source_type="synthetic",
+        line_coords=(960.0, 200.0, 960.0, 950.0),
+        line_direction="right",
+    )
+    assert service.counter.line_zone.start == (960.0, 200.0)
+    assert service.counter.line_zone.end == (960.0, 950.0)
+    assert service._custom_line_set is True
+
+
+def test_main_startup_ignores_placeholder_mismatch():
+    """Verify main() startup ignores placeholder 0,240,640,240 when remote direction is right/left."""
+    mock_remote = {
+        "line_coords": "0,240,640,240",
+        "line_direction": "right",
+    }
+    with patch("services.counter.main.fetch_remote_line_config", return_value=mock_remote), \
+         patch("services.counter.main.CounterService") as mock_service_cls:
+        instance = mock_service_cls.return_value
+        instance.run.return_value = 0
+        main(["--line-id", "line-1", "--max-frames", "1"])
+        # Should NOT have passed line_coords=(0.0, 240.0, 640.0, 240.0)
+        # because the placeholder was ignored
+        call_kwargs = mock_service_cls.call_args.kwargs
+        assert call_kwargs.get("line_coords") is None
+        assert call_kwargs.get("line_direction") == "right"
+
+
+
 

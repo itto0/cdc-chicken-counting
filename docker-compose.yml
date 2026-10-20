@@ -63,7 +63,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-8071}:80"
     depends_on:
       - api
     restart: unless-stopped

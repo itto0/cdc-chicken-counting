@@ -203,6 +203,38 @@ class CounterService:
             self.counter = counter
         else:
             if self.line_coords is not None:
+                x1, y1, x2, y2 = self.line_coords
+                dx = abs(x2 - x1)
+                dy = abs(y2 - y1)
+                is_mismatch = False
+                expected_orient = ""
+                actual_orient = ""
+                if self.line_direction in ("right", "left") and dy <= dx:
+                    is_mismatch = True
+                    expected_orient = "vertical"
+                    actual_orient = "horizontal or diagonal"
+                elif self.line_direction in ("down", "up", "in", "out") and dx <= dy:
+                    is_mismatch = True
+                    expected_orient = "horizontal"
+                    actual_orient = "vertical or diagonal"
+
+                if is_mismatch:
+                    logger.warning(
+                        "Geometry mismatch detected: line_direction is '%s' (requires %s line) "
+                        "but line_coords %s is %s (dx=%.1f, dy=%.1f). "
+                        "Auto-correcting to automatic %s line placement.",
+                        self.line_direction,
+                        expected_orient,
+                        self.line_coords,
+                        actual_orient,
+                        dx,
+                        dy,
+                        expected_orient,
+                    )
+                    self.line_coords = None
+                    self._custom_line_set = False
+
+            if self.line_coords is not None:
                 start_pt = (self.line_coords[0], self.line_coords[1])
                 end_pt = (self.line_coords[2], self.line_coords[3])
             elif self.line_direction in ("right", "left"):
@@ -1085,13 +1117,6 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     if enable_sync and args.api_sync_url:
         logger.info("Attempting to fetch remote line configuration for %s from %s...", args.line_id, args.api_sync_url)
         remote_config = fetch_remote_line_config(args.api_sync_url, args.line_id, api_token=args.api_token)
-        if remote_config:
-            if not args.video and remote_config.get("video_url"):
-                args.video = remote_config["video_url"]
-                logger.info("[RemoteConfig] Applied video source: %s", args.video)
-            if not args.line and remote_config.get("line_coords"):
-                args.line = remote_config["line_coords"]
-                logger.info("[RemoteConfig] Applied line coordinates: %s", args.line)
 
     if args.direction is None:
         if remote_config and remote_config.get("line_direction"):
@@ -1099,6 +1124,24 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             logger.info("[RemoteConfig] Applied line direction: %s", args.direction)
         else:
             args.direction = "down"
+
+    if remote_config:
+        if not args.video and remote_config.get("video_url"):
+            args.video = remote_config["video_url"]
+            logger.info("[RemoteConfig] Applied video source: %s", args.video)
+        if not args.line and remote_config.get("line_coords"):
+            remote_line = remote_config["line_coords"].strip()
+            # If remote config returns placeholder horizontal line but direction is horizontal, ignore placeholder
+            if args.direction in ("right", "left") and remote_line == "0,240,640,240":
+                logger.warning(
+                    "[RemoteConfig] Ignoring placeholder horizontal line '%s' because line direction is '%s'. "
+                    "Allowing automatic vertical line placement.",
+                    remote_line,
+                    args.direction,
+                )
+            else:
+                args.line = remote_line
+                logger.info("[RemoteConfig] Applied line coordinates: %s", args.line)
 
     video_source_type = "file" if args.video else args.source
 

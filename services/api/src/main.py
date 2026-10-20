@@ -34,7 +34,7 @@ def init_db(target_engine=None) -> None:
                     name="Lini Konveyor 1",
                     daily_target=62000,
                     line_direction="right",
-                    line_coords="0,240,640,240",
+                    line_coords="960,200,960,950",
                     is_active=True,
                 )
             )

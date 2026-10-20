@@ -50,3 +50,20 @@ def test_env_counter_example_exists():
     assert "LINE_ID=" in content
     assert "VIDEO_PATH=" in content
     assert "API_TOKEN=" in content
+
+
+def test_main_docker_compose_frontend_port_configurable():
+    root_dir = Path(__file__).resolve().parents[3]
+    compose_path = root_dir / "docker-compose.yml"
+    assert compose_path.exists(), "docker-compose.yml must exist at repository root"
+
+    with open(compose_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    frontend = config["services"]["frontend"]
+    ports = frontend.get("ports", [])
+    # Verify port is parameterized to prevent Dokploy host port 3000 collision
+    assert any("FRONTEND_PORT" in str(p) for p in ports), (
+        "Frontend port must be parameterized with FRONTEND_PORT to avoid port 3000 collisions"
+    )
+

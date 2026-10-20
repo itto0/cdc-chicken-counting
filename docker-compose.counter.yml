@@ -12,6 +12,7 @@ services:
       - VIDEO_PATH=${VIDEO_PATH:-/samples/Rekaman_2.MOV}
       - LOOP_VIDEO=${LOOP_VIDEO:-1}
       - LINE_DIRECTION=${LINE_DIRECTION:-right}
+      - LINE_COORDS=${LINE_COORDS:-}
       - TARGET_FPS=${TARGET_FPS:-30.0}
       - API_SYNC_URL=${API_SYNC_URL:-https://cdc-api.onrender.com/api/v1/sync/batch}
       - API_TOKEN=${API_TOKEN:-}
