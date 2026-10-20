@@ -15,7 +15,6 @@ interface ReportKpiCardsProps {
 export function ReportKpiCards({ metrics }: ReportKpiCardsProps) {
   const totalCount = metrics?.totalCount ?? 0;
   const avgRateCpm = metrics?.avgRateCpm ?? 0;
-  const avgAccuracyPct = metrics?.avgAccuracyPct ?? 99.1;
   const totalOperationMinutes = metrics?.totalOperationMinutes ?? 0;
 
   const safeMinutes = Math.max(
@@ -32,11 +31,17 @@ export function ReportKpiCards({ metrics }: ReportKpiCardsProps) {
   const safeRate = Number.isFinite(avgRateCpm) ? Math.round(avgRateCpm) : 0;
   const formattedRate = safeRate.toLocaleString("id-ID");
 
-  const safeAccuracy = Number.isFinite(avgAccuracyPct) ? avgAccuracyPct : 99.1;
-  const formattedAccuracy = safeAccuracy.toLocaleString("id-ID", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  });
+  const hasAccuracy =
+    (metrics?.totalCount ?? 0) > 0 &&
+    metrics?.avgAccuracyPct != null &&
+    metrics.avgAccuracyPct > 0;
+
+  const formattedAccuracy = hasAccuracy
+    ? `${metrics.avgAccuracyPct.toLocaleString("id-ID", {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      })}%`
+    : "-";
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -93,9 +98,11 @@ export function ReportKpiCards({ metrics }: ReportKpiCardsProps) {
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold tracking-tight text-slate-900">{formattedAccuracy}%</span>
+            <span className="text-2xl font-bold tracking-tight text-slate-900">{formattedAccuracy}</span>
           </div>
-          <p className="mt-1 text-[11px] text-emerald-600 font-medium">Sangat Baik</p>
+          {hasAccuracy && (
+            <p className="mt-1 text-[11px] text-emerald-600 font-medium">Sangat Baik</p>
+          )}
         </CardContent>
       </Card>
 

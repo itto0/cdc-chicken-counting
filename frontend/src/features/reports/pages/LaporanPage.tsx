@@ -84,8 +84,7 @@ export default function LaporanPage() {
               lineName: line.name || line.id,
               count: agg.count ?? 0,
               ratePerMin: agg.rate_per_min ?? 0,
-              accuracyPct:
-                agg.status === "Warning" ? 98.8 : agg.status === "Critical" ? 97.5 : 99.2,
+              accuracyPct: 0,
               status: agg.status || "Normal",
             });
           });

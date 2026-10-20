@@ -37,7 +37,8 @@ export function SystemStatusCard({
   };
 
   const statusStyle = getStatusColor();
-  const hasLatency = latencyMs > 0 && normalizedState !== "offline";
+  const hasLatency =
+    latencyMs > 0 && (normalizedState === "online" || normalizedState === "degraded");
 
   return (
     <Card className="rounded-2xl border-slate-200/80 shadow-sm bg-white">

@@ -23,7 +23,7 @@ export interface ReportsTableProps {
 const ITEMS_PER_PAGE = 10;
 
 function isAggregateItem(item: ReportRowItem | AggregateItemDTO): item is AggregateItemDTO {
-  return "bucket" in item && !("timestamp" in item);
+  return Boolean(item && typeof item === "object" && "bucket" in item && !("timestamp" in item));
 }
 
 function normalizeRow(item: ReportRowItem | AggregateItemDTO, index: number): ReportRowItem {
@@ -138,10 +138,12 @@ export function ReportsTable({
                     </TableCell>
                     <TableCell className="text-slate-700 text-xs py-3.5">{Math.round(row.ratePerMin ?? 0)} cpm</TableCell>
                     <TableCell className="text-slate-700 text-xs py-3.5">
-                      {`${(row.accuracyPct ?? 0).toLocaleString("id-ID", {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1,
-                      })}%`}
+                      {(row.count ?? 0) === 0 || (row.accuracyPct ?? 0) <= 0
+                        ? "-"
+                        : `${(row.accuracyPct ?? 0).toLocaleString("id-ID", {
+                            minimumFractionDigits: 1,
+                            maximumFractionDigits: 1,
+                          })}%`}
                     </TableCell>
                     <TableCell className="py-3.5">{getStatusBadge(row.status)}</TableCell>
                   </TableRow>

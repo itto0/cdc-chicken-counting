@@ -66,7 +66,8 @@ describe("LaporanPage", () => {
       const zeroes = screen.getAllByText("0");
       expect(zeroes.length).toBeGreaterThanOrEqual(2); // totalCount and avgRateCpm
       expect(screen.getByText("0 jam 0 mnt")).toBeDefined();
-      expect(screen.getByText("0,0%")).toBeDefined();
+      expect(screen.getByText("-")).toBeDefined();
+      expect(screen.queryByText("Sangat Baik")).toBeNull();
     });
 
     expect(screen.getByText("Belum ada riwayat data penghitungan untuk filter yang dipilih")).toBeDefined();

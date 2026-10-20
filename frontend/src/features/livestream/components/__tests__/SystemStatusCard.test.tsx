@@ -18,4 +18,18 @@ describe("SystemStatusCard", () => {
     expect(screen.getByText("18")).toBeDefined();
     expect(screen.getByText("Online")).toBeDefined();
   });
+
+  it("renders latency when streamState is degraded", () => {
+    render(<SystemStatusCard fps={15} latencyMs={120} streamState="degraded" />);
+    expect(screen.getByText("15")).toBeDefined();
+    expect(screen.getByText("120")).toBeDefined();
+    expect(screen.getByText("Degraded")).toBeDefined();
+  });
+
+  it("hides latency with '-' when streamState is offline even if latencyMs > 0", () => {
+    render(<SystemStatusCard fps={0} latencyMs={50} streamState="offline" />);
+    expect(screen.getByText("-")).toBeDefined();
+    expect(screen.queryByText("50")).toBeNull();
+    expect(screen.getByText("Offline")).toBeDefined();
+  });
 });
