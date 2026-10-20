@@ -9,7 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-FIXED_NOW = datetime(2026, 10, 16, 2, 0, 0, tzinfo=timezone.utc)
+FIXED_NOW = datetime(2026, 10, 15, 19, 0, 0, tzinfo=timezone.utc)  # 02:00:00 WIB (Jakarta) on 2026-10-16
 
 
 class MockDatetime(datetime):
@@ -48,7 +48,7 @@ def summary_client(test_engine, db_session):
     # 20 events 2 minutes ago (within last 5 min, today, shift, week)
     for i in range(20):
         db_session.add(CountEvent(line_id="line-1", track_id=i + 1, ts_utc=FIXED_NOW - timedelta(minutes=2), confidence=0.95))
-    # 20 events 4 hours ago (yesterday in UTC at 02:00, within shift [8h] and week [7d], outside today [2h])
+    # 20 events 4 hours ago (yesterday in Jakarta WIB at 02:00, within shift [8h] and week [7d], outside today [2h])
     for i in range(20):
         db_session.add(CountEvent(line_id="line-1", track_id=20 + i + 1, ts_utc=FIXED_NOW - timedelta(hours=4), confidence=0.95))
     # 20 events 2 days ago (within week [7d], outside shift and today)

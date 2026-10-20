@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from services.api.src.db.models import Line, HealthSample, CountEvent, Alarm
 from services.api.src.db.session import get_db
 from services.api.src.api.auth import get_current_user, UserDTO
+from shared.time_utils import get_jakarta_today_bounds_utc
 
 router = APIRouter(prefix="/api/v1/lines", tags=["summary"])
 
@@ -39,21 +40,28 @@ def get_line_summary(
         raise HTTPException(status_code=404, detail="Line not found")
 
     now = datetime.now(timezone.utc)
+    today_start_utc, today_end_utc = get_jakarta_today_bounds_utc(now)
+    end_time: Optional[datetime] = None
     if period == "today":
-        start_time = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+        start_time = today_start_utc
+        end_time = today_end_utc
     elif period == "shift":
         start_time = now - timedelta(hours=8)
     elif period == "week":
         start_time = now - timedelta(days=7)
     else:
-        start_time = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+        start_time = today_start_utc
+        end_time = today_end_utc
 
     # Total count in period
-    total_count = db.scalar(
+    count_query = (
         select(func.count(CountEvent.id))
         .where(CountEvent.line_id == line_id)
         .where(CountEvent.ts_utc >= start_time)
-    ) or 0
+    )
+    if end_time is not None:
+        count_query = count_query.where(CountEvent.ts_utc <= end_time)
+    total_count = db.scalar(count_query) or 0
 
     target = line.daily_target or 62000
     attainment_pct = round((total_count / target) * 100.0, 1) if target > 0 else 0.0
@@ -104,11 +112,14 @@ def get_line_summary(
     last_event_str = last_event.ts_utc.isoformat() if last_event else None
 
     # Detection accuracy based on average event confidence
-    avg_conf = db.scalar(
+    conf_query = (
         select(func.avg(CountEvent.confidence))
         .where(CountEvent.line_id == line_id)
         .where(CountEvent.ts_utc >= start_time)
     )
+    if end_time is not None:
+        conf_query = conf_query.where(CountEvent.ts_utc <= end_time)
+    avg_conf = db.scalar(conf_query)
     detection_accuracy = round(float(avg_conf) * 100.0, 1) if avg_conf is not None else 99.2
 
     return LineSummaryResponse(

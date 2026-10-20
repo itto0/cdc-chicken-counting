@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from services.api.src.db.models import Line, HealthSample, CountEvent
 from services.api.src.db.session import get_db
 from services.api.src.api.auth import get_current_user, require_role, UserDTO
+from shared.time_utils import get_jakarta_today_bounds_utc
 
 router = APIRouter(prefix="/api/v1/lines", tags=["lines"])
 
@@ -178,7 +179,7 @@ def list_lines(
 ):
     lines = db.scalars(select(Line)).all()
     now = datetime.now(timezone.utc)
-    today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    today_start_utc, today_end_utc = get_jakarta_today_bounds_utc(now)
 
     result = []
     for line in lines:
@@ -204,7 +205,8 @@ def list_lines(
         count = db.scalar(
             select(func.count(CountEvent.id))
             .where(CountEvent.line_id == line.id)
-            .where(CountEvent.ts_utc >= today_start)
+            .where(CountEvent.ts_utc >= today_start_utc)
+            .where(CountEvent.ts_utc <= today_end_utc)
         ) or 0
 
         result.append(
