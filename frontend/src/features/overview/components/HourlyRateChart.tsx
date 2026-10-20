@@ -1,4 +1,5 @@
 import ReactECharts from "echarts-for-react";
+import { LineChart as LineChartIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { AggregateItemDTO } from "@/types";
 
@@ -14,15 +15,10 @@ export function HourlyRateChart({ data = [] }: HourlyRateChartProps) {
     }
     return bucket;
   };
-  const times = (data ?? []).map((d) => formatBucketHour(d.bucket));
-  const counts = (data ?? []).map((d) => d.count);
 
-  // Fallback demo points mimicking the mockup's smooth wave if empty
-  const defaultTimes = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
-  const defaultCounts = [120, 280, 240, 390, 310, 520, 380, 420, 260, 410];
-
-  const chartTimes = times.length > 0 ? times : defaultTimes;
-  const chartCounts = counts.length > 0 ? counts : defaultCounts;
+  const hasData = (data ?? []).length > 0 && (data ?? []).some((d) => (d.count ?? 0) > 0);
+  const times = hasData ? (data ?? []).map((d) => formatBucketHour(d.bucket)) : [];
+  const counts = hasData ? (data ?? []).map((d) => d.count) : [];
 
   const option = {
     tooltip: {
@@ -41,7 +37,7 @@ export function HourlyRateChart({ data = [] }: HourlyRateChartProps) {
     },
     xAxis: {
       type: "category",
-      data: chartTimes,
+      data: times,
       boundaryGap: false,
       axisLine: { show: false },
       axisTick: { show: false },
@@ -61,7 +57,7 @@ export function HourlyRateChart({ data = [] }: HourlyRateChartProps) {
         type: "line",
         smooth: 0.5,
         symbol: "none",
-        data: chartCounts,
+        data: counts,
         lineStyle: {
           color: "#2563eb",
           width: 2.5,
@@ -91,12 +87,20 @@ export function HourlyRateChart({ data = [] }: HourlyRateChartProps) {
         </h3>
       </div>
       <CardContent className="p-4 pt-1">
-        <div className="h-[210px] w-full">
-          <ReactECharts
-            option={option}
-            notMerge={true}
-            style={{ height: "100%", width: "100%" }}
-          />
+        <div className="h-[210px] w-full flex items-center justify-center">
+          {hasData ? (
+            <ReactECharts
+              option={option}
+              notMerge={true}
+              style={{ height: "100%", width: "100%" }}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center text-center p-6 text-slate-400">
+              <LineChartIcon className="w-10 h-10 mb-2 stroke-[1.25] text-slate-300" aria-hidden="true" />
+              <p className="text-sm font-medium text-slate-600">Belum ada data penghitungan hari ini</p>
+              <p className="text-xs text-slate-400 mt-0.5">Data grafik per jam akan muncul otomatis saat konveyor aktif</p>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
