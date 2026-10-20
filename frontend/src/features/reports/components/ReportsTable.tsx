@@ -138,7 +138,7 @@ export function ReportsTable({
                     </TableCell>
                     <TableCell className="text-slate-700 text-xs py-3.5">{Math.round(row.ratePerMin ?? 0)} cpm</TableCell>
                     <TableCell className="text-slate-700 text-xs py-3.5">
-                      {`${(row.accuracyPct ?? 99.2).toLocaleString("id-ID", {
+                      {`${(row.accuracyPct ?? 0).toLocaleString("id-ID", {
                         minimumFractionDigits: 1,
                         maximumFractionDigits: 1,
                       })}%`}
