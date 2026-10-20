@@ -7,9 +7,9 @@ interface SystemStatusCardProps {
 }
 
 export function SystemStatusCard({
-  fps = 30,
-  latencyMs = 42,
-  streamState = "online",
+  fps = 0,
+  latencyMs = 0,
+  streamState = "offline",
 }: SystemStatusCardProps) {
   const normalizedState = (streamState || "offline").toLowerCase();
 
@@ -37,6 +37,7 @@ export function SystemStatusCard({
   };
 
   const statusStyle = getStatusColor();
+  const hasLatency = latencyMs > 0 && normalizedState !== "offline";
 
   return (
     <Card className="rounded-2xl border-slate-200/80 shadow-sm bg-white">
@@ -62,9 +63,16 @@ export function SystemStatusCard({
             <span className="text-xs text-slate-500 font-medium block mb-1">
               Latensi
             </span>
-            <span className="text-2xl font-bold tracking-tight text-slate-900">
-              {Math.round(latencyMs)} <span className="text-sm font-normal text-slate-500">ms</span>
-            </span>
+            {hasLatency ? (
+              <span className="text-2xl font-bold tracking-tight text-slate-900">
+                {Math.round(latencyMs)}{" "}
+                <span className="text-sm font-normal text-slate-500">ms</span>
+              </span>
+            ) : (
+              <span className="text-2xl font-bold tracking-tight text-slate-900">
+                -
+              </span>
+            )}
           </div>
 
           {/* Status Edge */}

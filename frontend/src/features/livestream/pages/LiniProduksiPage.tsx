@@ -62,8 +62,8 @@ export default function LiniProduksiPage() {
         {/* Right Column: System Status + Alarms & Notifikasi */}
         <div className="lg:col-span-5 space-y-4">
           <SystemStatusCard
-            fps={fps ?? 30}
-            latencyMs={latencyMs ?? 42}
+            fps={fps ?? 0}
+            latencyMs={latencyMs ?? 0}
             streamState={isStreaming ? (streamState?.toLowerCase() || "online") : "offline"}
           />
           <LiveAlarmsCard lineId={currentLineId} />

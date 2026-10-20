@@ -31,7 +31,7 @@ export const FALLBACK_MOCK_LINE: Line = {
   name: "Conveyor Line 1",
   is_active: true,
   daily_target: 60000,
-  status: "online",
+  status: "offline",
   total_today: 0,
   last_ping: null,
 };
