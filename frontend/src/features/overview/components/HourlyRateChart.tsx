@@ -2,20 +2,13 @@ import ReactECharts from "echarts-for-react";
 import { LineChart as LineChartIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { AggregateItemDTO } from "@/types";
+import { formatBucketHour } from "@/utils/time";
 
 interface HourlyRateChartProps {
   data?: AggregateItemDTO[];
 }
 
 export function HourlyRateChart({ data = [] }: HourlyRateChartProps) {
-  const formatBucketHour = (bucket: string) => {
-    if (!bucket) return "";
-    if (bucket.includes("T")) {
-      return bucket.split("T")[1].slice(0, 5);
-    }
-    return bucket;
-  };
-
   const hasData = (data ?? []).length > 0 && (data ?? []).some((d) => (d.count ?? 0) > 0);
   const times = hasData ? (data ?? []).map((d) => formatBucketHour(d.bucket)) : [];
   const counts = hasData ? (data ?? []).map((d) => d.count) : [];

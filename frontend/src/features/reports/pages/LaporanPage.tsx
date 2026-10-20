@@ -3,58 +3,13 @@ import { AlertCircle, X } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { useAppContext } from "@/context/AppContext";
+import { formatBucketHour, formatBucketDate } from "@/utils/time";
 import { reportsApi } from "../api/reports.api";
 import { ReportFilterBar } from "../components/ReportFilterBar";
 import { ReportKpiCards, type ReportSummaryMetrics } from "../components/ReportKpiCards";
 import { ReportsTable, type ReportRowItem } from "../components/ReportsTable";
 
-export const formatBucketHour = (bucketStr: string): string => {
-  try {
-    const isoStr =
-      bucketStr.includes("T") &&
-      !bucketStr.endsWith("Z") &&
-      !/[+-]\d{2}(:?\d{2})?$/.test(bucketStr)
-        ? `${bucketStr}Z`
-        : bucketStr;
-    const d = new Date(isoStr);
-    if (!isNaN(d.getTime())) {
-      return d
-        .toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-          timeZone: "Asia/Jakarta",
-        })
-        .replace(".", ":");
-    }
-  } catch {
-    // Fallback to substring slicing if not a valid ISO date
-  }
-  return bucketStr.includes("T") ? bucketStr.split("T")[1].slice(0, 5) : bucketStr;
-};
-
-export const formatBucketDate = (bucketStr: string): string => {
-  try {
-    const isoStr =
-      bucketStr.includes("T") &&
-      !bucketStr.endsWith("Z") &&
-      !/[+-]\d{2}(:?\d{2})?$/.test(bucketStr)
-        ? `${bucketStr}Z`
-        : bucketStr;
-    const d = new Date(isoStr);
-    if (!isNaN(d.getTime())) {
-      return d.toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        timeZone: "Asia/Jakarta",
-      });
-    }
-  } catch {
-    // Fallback
-  }
-  return "Hari Ini";
-};
+export { formatBucketHour, formatBucketDate };
 
 export default function LaporanPage() {
   const { currentLineId, lines, isConnected } = useAppContext();

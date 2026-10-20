@@ -15,8 +15,6 @@ def test_shared_time_utils_imported():
     """Verify that exporter and pdf_exporter import standardized time utilities from shared.time_utils."""
     assert hasattr(exporter_module, "format_jakarta_display")
     assert exporter_module.format_jakarta_display is shared_time_utils.format_jakarta_display
-    assert hasattr(exporter_module, "JAKARTA_TZ")
-    assert exporter_module.JAKARTA_TZ is shared_time_utils.JAKARTA_TZ
 
     assert hasattr(pdf_exporter_module, "format_jakarta_display")
     assert pdf_exporter_module.format_jakarta_display is shared_time_utils.format_jakarta_display

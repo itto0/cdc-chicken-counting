@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -10,6 +9,7 @@ from services.api.src.db.session import get_db
 from services.api.src.services.alarms import AlarmEvaluator
 from services.api.src.services.preview import is_stream_requested
 from shared.contracts import SyncBatchPayload
+from shared.time_utils import get_jakarta_today_bounds_utc
 
 router = APIRouter(prefix="/api/v1/sync", tags=["sync"])
 
@@ -69,17 +69,14 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
 
     # Wire Alarm Evaluator and SSE Broadcaster for aggregates
     if payload.aggregates:
-        today_start_naive = (
-            datetime.now(timezone.utc)
-            .replace(hour=0, minute=0, second=0, microsecond=0)
-            .replace(tzinfo=None)
-        )
+        today_start_utc, today_end_utc = get_jakarta_today_bounds_utc()
 
         total_today = (
             db.query(func.count(CountEvent.id))
             .filter(
                 CountEvent.line_id == payload.line_id,
-                CountEvent.ts_utc >= today_start_naive,
+                CountEvent.ts_utc >= today_start_utc.replace(tzinfo=None),
+                CountEvent.ts_utc <= today_end_utc.replace(tzinfo=None),
             )
             .scalar()
             or 0
@@ -89,7 +86,8 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
                 db.query(func.sum(CountAggregate.count))
                 .filter(
                     CountAggregate.line_id == payload.line_id,
-                    CountAggregate.window_start >= today_start_naive,
+                    CountAggregate.window_start >= today_start_utc.replace(tzinfo=None),
+                    CountAggregate.window_start <= today_end_utc.replace(tzinfo=None),
                 )
                 .scalar()
                 or 0

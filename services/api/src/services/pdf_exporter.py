@@ -7,7 +7,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from shared.time_utils import now_jakarta, to_jakarta, format_jakarta_display, WIB_LABEL
+from shared.time_utils import now_jakarta, format_jakarta_display, WIB_LABEL
 
 
 class PDFReportGenerator:

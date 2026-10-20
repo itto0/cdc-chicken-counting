@@ -275,3 +275,60 @@ def test_sync_batch_evaluates_alarms_and_broadcasts(setup_test_db, monkeypatch):
     assert health_broadcasts[0]["fps"] == 0.0
     assert health_broadcasts[0]["status"] == "OFFLINE"
 
+
+def test_sync_batch_broadcast_total_today_uses_jakarta_bounds(monkeypatch, setup_test_db):
+    from shared.time_utils import get_jakarta_today_bounds_utc
+    from datetime import timedelta
+
+    start_utc, end_utc = get_jakarta_today_bounds_utc()
+    # Event before today's Jakarta day: 1 hour before start_utc
+    outside_ts = (start_utc - timedelta(hours=1)).replace(tzinfo=None)
+    # Event inside today's Jakarta day: 2 hours after start_utc
+    inside_ts = (start_utc + timedelta(hours=2)).replace(tzinfo=None)
+
+    with setup_test_db() as db:
+        ev_outside = CountEvent(
+            line_id="line-jkt-sync",
+            track_id=501,
+            ts_utc=outside_ts,
+            confidence=0.9,
+        )
+        ev_inside = CountEvent(
+            line_id="line-jkt-sync",
+            track_id=502,
+            ts_utc=inside_ts,
+            confidence=0.9,
+        )
+        db.add_all([ev_outside, ev_inside])
+        db.commit()
+
+    broadcasted_counts = []
+
+    def mock_broadcast(line_id, event_type, payload):
+        if event_type == "count":
+            broadcasted_counts.append((line_id, payload))
+
+    monkeypatch.setattr("services.api.src.api.sync.broadcast_line_update", mock_broadcast)
+
+    client = TestClient(app)
+    payload = {
+        "line_id": "line-jkt-sync",
+        "events": [],
+        "aggregates": [
+            {
+                "window_start": inside_ts.isoformat(),
+                "window_end": (inside_ts + timedelta(minutes=1)).isoformat(),
+                "count": 10,
+                "rate_per_min": 10.0,
+                "confidence_avg": 0.95,
+                "status": "NORMAL",
+            }
+        ],
+    }
+    resp = client.post("/api/v1/sync/batch", json=payload)
+    assert resp.status_code == 200
+    assert len(broadcasted_counts) == 1
+    # total_today should count ONLY the inside event (1 event), ignoring outside_ts
+    assert broadcasted_counts[0][1]["total_today"] == 1
+
+
