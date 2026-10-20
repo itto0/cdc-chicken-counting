@@ -37,27 +37,6 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  counter:
-    build:
-      context: ./services/counter
-      dockerfile: Dockerfile
-    env_file:
-      - .env
-    environment:
-      - API_SYNC_URL=http://api:${PORT:-8070}/api/v1/sync/batch
-      - LINE_ID=line-1
-      - DB_PATH=/data/counter_outbox.db
-      - VIDEO_PATH=/samples/Rekaman_2.MOV
-      - LOOP_VIDEO=1
-      - LINE_DIRECTION=right
-      - TARGET_FPS=30.0
-    volumes:
-      - counter_data:/data
-      - ./samples:/samples:ro
-    restart: unless-stopped
-    depends_on:
-      - api
-
   frontend:
     build:
       context: ./frontend
@@ -70,4 +49,3 @@ services:
 
 volumes:
   postgres_data:
-  counter_data:
