@@ -19,7 +19,7 @@ from services.api.src.api.sync import router as sync_router
 from services.api.src.db.models import Base, Line, User
 from services.api.src.db.session import engine
 from services.api.src.services.auth import hash_password
-from sqlalchemy import select
+from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
 
 
@@ -27,17 +27,17 @@ def init_db(target_engine=None) -> None:
     eng = target_engine or engine
     Base.metadata.create_all(bind=eng)
 
-    # Dynamic SQLite migration for health_samples.accuracy_pct
-    with eng.connect() as conn:
-        try:
-            from sqlalchemy import text
-            res = conn.execute(text("PRAGMA table_info(health_samples)"))
-            cols = [r[1] for r in res.fetchall()]
-            if cols and "accuracy_pct" not in cols:
-                conn.execute(text("ALTER TABLE health_samples ADD COLUMN accuracy_pct REAL NULL"))
-                conn.commit()
-        except Exception:
-            pass
+    # Dynamic migration for health_samples.accuracy_pct across SQLite / Postgres
+    try:
+        inspector = inspect(eng)
+        if "health_samples" in inspector.get_table_names():
+            col_names = [c["name"] for c in inspector.get_columns("health_samples")]
+            if "accuracy_pct" not in col_names:
+                with eng.connect() as conn:
+                    conn.execute(text("ALTER TABLE health_samples ADD COLUMN accuracy_pct REAL NULL"))
+                    conn.commit()
+    except Exception:
+        pass
 
     with Session(eng) as session:
         if not session.get(Line, "line-1"):

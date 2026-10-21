@@ -55,9 +55,9 @@ export function SystemStatusCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-4 pt-2">
-        <div className="grid grid-cols-4 divide-x divide-slate-100 text-center sm:text-left">
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 text-center sm:text-left gap-y-3 sm:gap-y-0">
           {/* FPS */}
-          <div className="px-2 first:pl-0">
+          <div className="px-3 first:pl-0 pt-2 sm:pt-0">
             <span className="text-xs text-slate-500 font-medium block mb-1">
               FPS
             </span>
@@ -67,7 +67,7 @@ export function SystemStatusCard({
           </div>
 
           {/* Latensi */}
-          <div className="px-3">
+          <div className="px-3 pt-2 sm:pt-0">
             <span className="text-xs text-slate-500 font-medium block mb-1">
               Latensi
             </span>
@@ -84,7 +84,7 @@ export function SystemStatusCard({
           </div>
 
           {/* Akurasi */}
-          <div className="px-3">
+          <div className="px-3 pt-2 sm:pt-0">
             <span className="text-xs text-slate-500 font-medium block mb-1">
               Akurasi
             </span>
@@ -94,11 +94,11 @@ export function SystemStatusCard({
           </div>
 
           {/* Status Edge */}
-          <div className="px-3 last:pr-0">
+          <div className="px-3 last:pr-0 pt-2 sm:pt-0">
             <span className="text-xs text-slate-500 font-medium block mb-1">
               Status Edge
             </span>
-            <div className="flex items-center gap-2 mt-1.5">
+            <div className="flex items-center justify-center sm:justify-start gap-2 mt-1.5">
               <span
                 className={`w-2.5 h-2.5 rounded-full ${statusStyle.dot} shrink-0`}
                 aria-hidden="true"
