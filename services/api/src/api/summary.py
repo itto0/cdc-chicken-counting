@@ -111,16 +111,19 @@ def get_line_summary(
     ).first()
     last_event_str = last_event.ts_utc.isoformat() if last_event else None
 
-    # Detection accuracy based on average event confidence
-    conf_query = (
-        select(func.avg(CountEvent.confidence))
-        .where(CountEvent.line_id == line_id)
-        .where(CountEvent.ts_utc >= start_time)
-    )
-    if end_time is not None:
-        conf_query = conf_query.where(CountEvent.ts_utc <= end_time)
-    avg_conf = db.scalar(conf_query)
-    detection_accuracy = round(float(avg_conf) * 100.0, 1) if avg_conf is not None else 99.2
+    # Detection accuracy prioritized from latest health sample, then average confidence, then fallback
+    if latest_health and latest_health.accuracy_pct is not None:
+        detection_accuracy = round(latest_health.accuracy_pct, 1)
+    else:
+        conf_query = (
+            select(func.avg(CountEvent.confidence))
+            .where(CountEvent.line_id == line_id)
+            .where(CountEvent.ts_utc >= start_time)
+        )
+        if end_time is not None:
+            conf_query = conf_query.where(CountEvent.ts_utc <= end_time)
+        avg_conf = db.scalar(conf_query)
+        detection_accuracy = round(float(avg_conf) * 100.0, 1) if avg_conf is not None else 99.2
 
     return LineSummaryResponse(
         line_id=line_id,

@@ -221,3 +221,33 @@ def test_get_line_summary_detection_accuracy(summary_client, db_session):
     res_with_events = summary_client.get("/api/v1/lines/line-1/summary?period=today").json()
     assert res_with_events["detection_accuracy_pct"] == 99.0
 
+
+@pytest.fixture
+def client(summary_client):
+    return summary_client
+
+
+def test_summary_uses_latest_health_accuracy_pct(client, db_session):
+    from services.api.src.db.models import HealthSample, Line
+    from datetime import datetime, timezone
+
+    if not db_session.get(Line, "line1"):
+        db_session.add(Line(id="line1", name="Line 1", daily_target=1000, is_active=True))
+
+    sample = HealthSample(
+        line_id="line1",
+        timestamp=datetime.now(timezone.utc),
+        fps=30.0,
+        latency_p95_ms=20.0,
+        cpu_pct=10.0,
+        mem_pct=30.0,
+        stream_state="ONLINE",
+        accuracy_pct=97.8,
+    )
+    db_session.add(sample)
+    db_session.commit()
+
+    res = client.get("/api/v1/lines/line1/summary?period=today").json()
+    assert res["detection_accuracy_pct"] == 97.8
+
+

@@ -14,6 +14,7 @@ from shared.time_utils import get_jakarta_today_bounds_utc
 router = APIRouter(prefix="/api/v1/sync", tags=["sync"])
 
 
+@router.post("")
 @router.post("/batch")
 def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
     ingested_events = 0
@@ -59,6 +60,7 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
             stream_state=payload.health.stream_state,
             model_name=payload.health.model_name,
             model_version=payload.health.model_version,
+            accuracy_pct=payload.health.accuracy_pct,
         )
         db.add(health_record)
         health_ingested = True
@@ -139,6 +141,7 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
                 "fps": payload.health.fps,
                 "latency_ms": payload.health.latency_p95_ms,
                 "status": payload.health.stream_state,
+                "accuracy_pct": payload.health.accuracy_pct,
             },
         )
 

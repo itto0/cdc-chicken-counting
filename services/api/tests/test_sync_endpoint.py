@@ -32,6 +32,20 @@ def setup_test_db(tmp_path):
     test_engine.dispose()
 
 
+@pytest.fixture
+def client():
+    return TestClient(app)
+
+
+@pytest.fixture
+def test_db(setup_test_db):
+    db = setup_test_db()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
 def test_sync_batch_endpoint_ingests_and_deduplicates():
     client = TestClient(app)
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -330,5 +344,60 @@ def test_sync_batch_broadcast_total_today_uses_jakarta_bounds(monkeypatch, setup
     assert len(broadcasted_counts) == 1
     # total_today should count ONLY the inside event (1 event), ignoring outside_ts
     assert broadcasted_counts[0][1]["total_today"] == 1
+
+
+def test_sync_health_with_accuracy_pct(client, test_db):
+    from services.api.src.db.models import HealthSample
+
+    payload = {
+        "line_id": "lineA",
+        "events": [],
+        "aggregates": [],
+        "health": {
+            "fps": 30.0,
+            "latency_p95_ms": 22.5,
+            "cpu_pct": 12.0,
+            "mem_pct": 45.0,
+            "stream_state": "ONLINE",
+            "accuracy_pct": 99.25,
+        },
+    }
+    resp = client.post("/api/v1/sync", json=payload)
+    assert resp.status_code == 200
+
+    record = test_db.query(HealthSample).filter_by(line_id="lineA").order_by(HealthSample.id.desc()).first()
+    assert record is not None
+    assert record.accuracy_pct == 99.25
+
+
+def test_sync_health_broadcasts_accuracy_pct(client, monkeypatch):
+    from services.api.src.api.live import broadcaster
+
+    broadcasted = []
+    monkeypatch.setattr(
+        broadcaster,
+        "publish",
+        lambda line_id, ev_type, data: broadcasted.append((line_id, ev_type, data)) or 1,
+    )
+
+    payload = {
+        "line_id": "lineA",
+        "events": [],
+        "aggregates": [],
+        "health": {
+            "fps": 30.0,
+            "latency_p95_ms": 22.5,
+            "cpu_pct": 12.0,
+            "mem_pct": 45.0,
+            "stream_state": "ONLINE",
+            "accuracy_pct": 99.25,
+        },
+    }
+    resp = client.post("/api/v1/sync", json=payload)
+    assert resp.status_code == 200
+
+    health_events = [data for line, ev_type, data in broadcasted if ev_type == "health"]
+    assert len(health_events) == 1
+    assert health_events[0]["accuracy_pct"] == 99.25
 
 
