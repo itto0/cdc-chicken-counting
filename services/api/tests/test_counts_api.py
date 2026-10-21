@@ -223,6 +223,44 @@ def test_get_line_counts_period_today_filtering(counts_client):
     assert data["aggregates"][0]["count"] == 1
 
 
+def test_get_line_counts_period_shift_filtering(counts_client):
+    db = next(app.dependency_overrides[get_db]())
+    db.add(Line(id="line-shift", name="Line Shift", daily_target=5000, is_active=True))
+    now_utc = datetime.now(timezone.utc)
+    # Event within 8 hours
+    db.add(CountEvent(line_id="line-shift", track_id=1, ts_utc=now_utc - timedelta(hours=2), confidence=0.98))
+    # Event outside 8 hours (e.g. 10 hours ago)
+    db.add(CountEvent(line_id="line-shift", track_id=2, ts_utc=now_utc - timedelta(hours=10), confidence=0.98))
+    db.commit()
+
+    response = counts_client.get("/api/v1/lines/line-shift/counts?granularity=hourly&period=shift")
+    assert response.status_code == 200
+    data = response.json()
+    assert "aggregates" in data
+    assert data["pagination"]["total"] == 1
+    assert len(data["aggregates"]) == 1
+    assert data["aggregates"][0]["count"] == 1
+
+
+def test_get_line_counts_period_week_filtering(counts_client):
+    db = next(app.dependency_overrides[get_db]())
+    db.add(Line(id="line-week", name="Line Week", daily_target=5000, is_active=True))
+    now_utc = datetime.now(timezone.utc)
+    # Event within 7 days
+    db.add(CountEvent(line_id="line-week", track_id=1, ts_utc=now_utc - timedelta(days=3), confidence=0.98))
+    # Event outside 7 days (e.g. 9 days ago)
+    db.add(CountEvent(line_id="line-week", track_id=2, ts_utc=now_utc - timedelta(days=9), confidence=0.98))
+    db.commit()
+
+    response = counts_client.get("/api/v1/lines/line-week/counts?granularity=hourly&period=week")
+    assert response.status_code == 200
+    data = response.json()
+    assert "aggregates" in data
+    assert data["pagination"]["total"] == 1
+    assert len(data["aggregates"]) == 1
+    assert data["aggregates"][0]["count"] == 1
+
+
 def test_get_line_counts_hourly_fallback_to_aggregates(counts_client):
     db = next(app.dependency_overrides[get_db]())
     db.add(Line(id="line-fallback", name="Line Fallback", daily_target=5000, is_active=True))

@@ -26,64 +26,67 @@ export function HourlyRateChart({ data = [] }: HourlyRateChartProps) {
     return HOURS_24.map((hour) => hourMap[hour] || 0);
   }, [data, hasData]);
 
-  const option = {
-    tooltip: {
-      trigger: "axis",
-      backgroundColor: "#ffffff",
-      borderColor: "#e2e8f0",
-      textStyle: { color: "#0f172a", fontSize: 12 },
-      formatter: "{b}<br /><span style='font-weight:600;'>{c} ekor</span>",
-    },
-    grid: {
-      top: "10%",
-      left: "2%",
-      right: "2%",
-      bottom: "5%",
-      containLabel: true,
-    },
-    xAxis: {
-      type: "category",
-      data: HOURS_24,
-      boundaryGap: false,
-      axisLine: { show: false },
-      axisTick: { show: false },
-      axisLabel: { color: "#94a3b8", fontSize: 11 },
-    },
-    yAxis: {
-      type: "value",
-      splitLine: {
-        show: true,
-        lineStyle: { color: "#f1f5f9", width: 1 },
+  const option = useMemo(
+    () => ({
+      tooltip: {
+        trigger: "axis",
+        backgroundColor: "#ffffff",
+        borderColor: "#e2e8f0",
+        textStyle: { color: "#0f172a", fontSize: 12 },
+        formatter: "{b}<br /><span style='font-weight:600;'>{c} ekor</span>",
       },
-      axisLabel: { show: false },
-    },
-    series: [
-      {
-        name: "Penghitungan",
-        type: "line",
-        smooth: 0.5,
-        symbol: "none",
-        data: counts24,
-        lineStyle: {
-          color: "#2563eb",
-          width: 2.5,
+      grid: {
+        top: "10%",
+        left: "2%",
+        right: "2%",
+        bottom: "5%",
+        containLabel: true,
+      },
+      xAxis: {
+        type: "category",
+        data: HOURS_24,
+        boundaryGap: false,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: "#94a3b8", fontSize: 11 },
+      },
+      yAxis: {
+        type: "value",
+        splitLine: {
+          show: true,
+          lineStyle: { color: "#f1f5f9", width: 1 },
         },
-        areaStyle: {
-          color: {
-            type: "linear",
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
-            colorStops: [
-              { offset: 0, color: "rgba(37, 99, 235, 0.22)" },
-              { offset: 1, color: "rgba(37, 99, 235, 0.0)" },
-            ],
+        axisLabel: { show: false },
+      },
+      series: [
+        {
+          name: "Penghitungan",
+          type: "line",
+          smooth: 0.5,
+          symbol: "none",
+          data: counts24,
+          lineStyle: {
+            color: "#2563eb",
+            width: 2.5,
+          },
+          areaStyle: {
+            color: {
+              type: "linear",
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: "rgba(37, 99, 235, 0.22)" },
+                { offset: 1, color: "rgba(37, 99, 235, 0.0)" },
+              ],
+            },
           },
         },
-      },
-    ],
-  };
+      ],
+    }),
+    [counts24]
+  );
 
   return (
     <Card className="rounded-2xl border-slate-200/80 shadow-sm bg-white">

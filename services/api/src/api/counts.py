@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -77,10 +77,19 @@ def get_line_counts(
     if to_time is not None:
         t_dt = _parse_filter_datetime(to_time, "to_time")
 
-    if period == "today" and f_dt is None and t_dt is None:
-        today_start_utc, today_end_utc = get_jakarta_today_bounds_utc()
-        f_dt = today_start_utc.replace(tzinfo=None)
-        t_dt = today_end_utc.replace(tzinfo=None)
+    if period and f_dt is None and t_dt is None:
+        if period == "today":
+            today_start_utc, today_end_utc = get_jakarta_today_bounds_utc()
+            f_dt = today_start_utc.replace(tzinfo=None)
+            t_dt = today_end_utc.replace(tzinfo=None)
+        elif period == "shift":
+            now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+            f_dt = now_utc - timedelta(hours=8)
+            t_dt = now_utc
+        elif period == "week":
+            now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+            f_dt = now_utc - timedelta(days=7)
+            t_dt = now_utc
 
     aggregates_dto: List[AggregateItemDTO] = []
 
@@ -91,7 +100,7 @@ def get_line_counts(
             events_query = events_query.where(CountEvent.ts_utc >= f_dt)
         if t_dt is not None:
             events_query = events_query.where(CountEvent.ts_utc <= t_dt)
-        events_query = events_query.order_by(CountEvent.ts_utc.asc())
+        events_query = events_query.order_by(CountEvent.ts_utc.asc()).limit(100000)
         event_timestamps = db.scalars(events_query).all()
 
         if event_timestamps:
@@ -117,7 +126,7 @@ def get_line_counts(
                 agg_query = agg_query.where(CountAggregate.window_start >= f_dt)
             if t_dt is not None:
                 agg_query = agg_query.where(CountAggregate.window_start <= t_dt)
-            agg_query = agg_query.order_by(CountAggregate.window_start.asc()).limit(500)
+            agg_query = agg_query.order_by(CountAggregate.window_start.asc()).limit(10000)
             aggs = db.scalars(agg_query).all()
 
             if aggs:
