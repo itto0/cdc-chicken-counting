@@ -363,3 +363,58 @@ def test_line_model_extended_fields(memory_db: Session):
     assert retrieved_default.line_direction == "down"
     assert retrieved_default.created_at is not None
     assert isinstance(retrieved_default.created_at, datetime)
+
+
+def test_health_sample_model_accuracy_pct(memory_db: Session):
+    from services.api.src.db.models import HealthSample
+
+    sample = HealthSample(
+        line_id="line-1",
+        fps=29.8,
+        latency_p95_ms=35.0,
+        cpu_pct=10.0,
+        mem_pct=20.0,
+        stream_state="ONLINE",
+        accuracy_pct=98.75,
+    )
+    memory_db.add(sample)
+    memory_db.commit()
+
+    retrieved = memory_db.query(HealthSample).filter_by(id=sample.id).first()
+    assert retrieved.accuracy_pct == 98.75
+
+
+def test_init_db_migrates_accuracy_pct(tmp_path):
+    test_db = tmp_path / "migration_test.db"
+    test_engine = create_engine(f"sqlite:///{test_db}")
+    with test_engine.connect() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE health_samples (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    line_id VARCHAR(50),
+                    timestamp DATETIME,
+                    fps FLOAT,
+                    latency_p95_ms FLOAT,
+                    cpu_pct FLOAT,
+                    mem_pct FLOAT,
+                    stream_state VARCHAR(20),
+                    model_name VARCHAR(100),
+                    model_version VARCHAR(50)
+                )
+                """
+            )
+        )
+        conn.commit()
+
+    init_db(target_engine=test_engine)
+
+    with test_engine.connect() as conn:
+        res = conn.execute(text("PRAGMA table_info(health_samples)"))
+        cols = [r[1] for r in res.fetchall()]
+        assert "accuracy_pct" in cols
+
+    test_engine.dispose()
+
+

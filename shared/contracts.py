@@ -24,6 +24,7 @@ class HealthSampleDTO(BaseModel):
     cpu_pct: float = Field(ge=0.0, le=100.0)
     mem_pct: float = Field(ge=0.0, le=100.0)
     stream_state: Literal["ONLINE", "OFFLINE", "DEGRADED"] = "ONLINE"
+    accuracy_pct: float | None = Field(default=None, ge=0.0, le=100.0)
     model_name: str = "yolo26n"
     model_version: str = "v1.0"
 

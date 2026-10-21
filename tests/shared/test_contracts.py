@@ -146,3 +146,28 @@ def test_contracts_independent_of_counter_service():
     counter_modules = [m for m in sys.modules if m.startswith("services.counter")]
     assert counter_modules == [], f"shared.contracts leaked counter dependencies: {counter_modules}"
 
+
+def test_health_sample_dto_accuracy_pct():
+    from shared.contracts import HealthSampleDTO
+
+    sample = HealthSampleDTO(
+        fps=30.0,
+        latency_p95_ms=25.0,
+        cpu_pct=15.0,
+        mem_pct=40.0,
+        stream_state="ONLINE",
+        accuracy_pct=99.25,
+    )
+    assert sample.accuracy_pct == 99.25
+
+    with pytest.raises(ValidationError):
+        HealthSampleDTO(
+            fps=30.0,
+            latency_p95_ms=25.0,
+            cpu_pct=15.0,
+            mem_pct=40.0,
+            stream_state="ONLINE",
+            accuracy_pct=105.0,
+        )
+
+

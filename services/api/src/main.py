@@ -26,6 +26,19 @@ from sqlalchemy.orm import Session
 def init_db(target_engine=None) -> None:
     eng = target_engine or engine
     Base.metadata.create_all(bind=eng)
+
+    # Dynamic SQLite migration for health_samples.accuracy_pct
+    with eng.connect() as conn:
+        try:
+            from sqlalchemy import text
+            res = conn.execute(text("PRAGMA table_info(health_samples)"))
+            cols = [r[1] for r in res.fetchall()]
+            if cols and "accuracy_pct" not in cols:
+                conn.execute(text("ALTER TABLE health_samples ADD COLUMN accuracy_pct REAL NULL"))
+                conn.commit()
+        except Exception:
+            pass
+
     with Session(eng) as session:
         if not session.get(Line, "line-1"):
             session.add(

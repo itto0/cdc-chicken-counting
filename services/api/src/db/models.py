@@ -67,6 +67,7 @@ class HealthSample(Base):
     cpu_pct: Mapped[float] = mapped_column(Float)
     mem_pct: Mapped[float] = mapped_column(Float)
     stream_state: Mapped[str] = mapped_column(String(20))
+    accuracy_pct: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
     model_name: Mapped[str | None] = mapped_column(String(100), nullable=True, default=None)
     model_version: Mapped[str | None] = mapped_column(String(50), nullable=True, default=None)
 
