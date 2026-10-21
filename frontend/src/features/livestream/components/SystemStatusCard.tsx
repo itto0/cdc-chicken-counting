@@ -1,17 +1,21 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-interface SystemStatusCardProps {
+export interface SystemStatusCardProps {
   fps?: number;
   latencyMs?: number;
+  accuracyPct?: number | null;
   streamState?: "online" | "degraded" | "offline" | string;
 }
 
 export function SystemStatusCard({
   fps = 0,
   latencyMs = 0,
+  accuracyPct = null,
   streamState = "offline",
 }: SystemStatusCardProps) {
   const normalizedState = (streamState || "offline").toLowerCase();
+  const isAvailable =
+    normalizedState === "online" || normalizedState === "degraded";
 
   const getStatusColor = () => {
     switch (normalizedState) {
@@ -37,8 +41,11 @@ export function SystemStatusCard({
   };
 
   const statusStyle = getStatusColor();
-  const hasLatency =
-    latencyMs > 0 && (normalizedState === "online" || normalizedState === "degraded");
+  const hasLatency = latencyMs > 0 && isAvailable;
+  const formattedAccuracy =
+    accuracyPct != null && accuracyPct > 0 && isAvailable
+      ? `${accuracyPct.toFixed(1)}%`
+      : "-";
 
   return (
     <Card className="rounded-2xl border-slate-200/80 shadow-sm bg-white">
@@ -48,7 +55,7 @@ export function SystemStatusCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-4 pt-2">
-        <div className="grid grid-cols-3 divide-x divide-slate-100 text-center sm:text-left">
+        <div className="grid grid-cols-4 divide-x divide-slate-100 text-center sm:text-left">
           {/* FPS */}
           <div className="px-2 first:pl-0">
             <span className="text-xs text-slate-500 font-medium block mb-1">
@@ -74,6 +81,16 @@ export function SystemStatusCard({
                 -
               </span>
             )}
+          </div>
+
+          {/* Akurasi */}
+          <div className="px-3">
+            <span className="text-xs text-slate-500 font-medium block mb-1">
+              Akurasi
+            </span>
+            <span className="text-2xl font-bold tracking-tight text-slate-900">
+              {formattedAccuracy}
+            </span>
           </div>
 
           {/* Status Edge */}

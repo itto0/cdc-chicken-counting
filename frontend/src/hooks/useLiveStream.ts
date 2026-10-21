@@ -9,6 +9,7 @@ export interface LiveStreamState {
   lastCountTime: string | null;
   fps: number;
   latencyMs: number;
+  accuracyPct: number | null;
   streamState: string;
   totalToday: number;
   countTick: number;
@@ -21,6 +22,7 @@ export function useLiveStream(lineId: string): LiveStreamState {
   const [lastCountTime, setLastCountTime] = useState<string | null>(null);
   const [fps, setFps] = useState<number>(0);
   const [latencyMs, setLatencyMs] = useState<number>(0);
+  const [accuracyPct, setAccuracyPct] = useState<number | null>(null);
   const [streamState, setStreamState] = useState<string>("OFFLINE");
   const [totalToday, setTotalToday] = useState<number>(0);
   const [countTick, setCountTick] = useState<number>(0);
@@ -185,6 +187,9 @@ export function useLiveStream(lineId: string): LiveStreamState {
         } else if (typeof data.latency_p95_ms === "number") {
           setLatencyMs(data.latency_p95_ms);
         }
+        if (typeof data.accuracy_pct === "number") {
+          setAccuracyPct(data.accuracy_pct);
+        }
         if (data.status) {
           setStreamState(String(data.status));
         } else if (data.stream_state) {
@@ -218,6 +223,9 @@ export function useLiveStream(lineId: string): LiveStreamState {
         if (typeof data.fps === "number") {
           setFps(data.fps);
         }
+        if (typeof data.accuracy_pct === "number") {
+          setAccuracyPct(data.accuracy_pct);
+        }
         if (typeof data.total_today === "number") {
           setTotalToday(data.total_today);
         }
@@ -241,6 +249,7 @@ export function useLiveStream(lineId: string): LiveStreamState {
     setLastCountTime(null);
     setFps(0);
     setLatencyMs(0);
+    setAccuracyPct(null);
     setTotalToday(0);
     setCountTick(0);
     connect();
@@ -257,6 +266,7 @@ export function useLiveStream(lineId: string): LiveStreamState {
     lastCountTime,
     fps,
     latencyMs,
+    accuracyPct,
     streamState,
     totalToday,
     countTick,
