@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { LineChart as LineChartIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,10 +9,22 @@ interface HourlyRateChartProps {
   data?: AggregateItemDTO[];
 }
 
+const HOURS_24 = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
+
 export function HourlyRateChart({ data = [] }: HourlyRateChartProps) {
   const hasData = (data ?? []).length > 0 && (data ?? []).some((d) => (d.count ?? 0) > 0);
-  const times = hasData ? (data ?? []).map((d) => formatBucketHour(d.bucket)) : [];
-  const counts = hasData ? (data ?? []).map((d) => d.count) : [];
+
+  const counts24 = useMemo(() => {
+    if (!hasData) return [];
+    const hourMap: Record<string, number> = {};
+    for (const item of data ?? []) {
+      const formatted = formatBucketHour(item.bucket);
+      // Normalize to HH:00
+      const hourKey = formatted.includes(":") ? `${formatted.split(":")[0]}:00` : formatted;
+      hourMap[hourKey] = (hourMap[hourKey] || 0) + (item.count || 0);
+    }
+    return HOURS_24.map((hour) => hourMap[hour] || 0);
+  }, [data, hasData]);
 
   const option = {
     tooltip: {
@@ -30,7 +43,7 @@ export function HourlyRateChart({ data = [] }: HourlyRateChartProps) {
     },
     xAxis: {
       type: "category",
-      data: times,
+      data: HOURS_24,
       boundaryGap: false,
       axisLine: { show: false },
       axisTick: { show: false },
@@ -50,7 +63,7 @@ export function HourlyRateChart({ data = [] }: HourlyRateChartProps) {
         type: "line",
         smooth: 0.5,
         symbol: "none",
-        data: counts,
+        data: counts24,
         lineStyle: {
           color: "#2563eb",
           width: 2.5,

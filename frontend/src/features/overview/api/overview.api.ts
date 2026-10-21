@@ -8,6 +8,7 @@ export const overviewApi = {
     const searchParams = new URLSearchParams();
     if (params.from) searchParams.set("from", params.from);
     if (params.to) searchParams.set("to", params.to);
+    if (params.period) searchParams.set("period", params.period);
     if (params.granularity) searchParams.set("granularity", params.granularity);
     const query = searchParams.toString();
     return http<LineCountsResponse>(`/api/v1/lines/${encodeURIComponent(lineId)}/counts${query ? `?${query}` : ""}`);

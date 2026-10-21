@@ -50,7 +50,7 @@ export default function DashboardPage() {
         });
 
       overviewApi
-        .getCounts(currentLineId, { granularity: "hourly" })
+        .getCounts(currentLineId, { granularity: "hourly", period: "today" })
         .then((res) => {
           if (isMounted && res?.aggregates) setAggregates(res.aggregates);
         })

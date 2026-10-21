@@ -86,6 +86,7 @@ export interface CountQueryParams {
   to?: string;
   from_time?: string;
   to_time?: string;
+  period?: "today" | "shift" | "week" | string;
   granularity?: "minute" | "hourly" | "daily" | string;
   page?: number;
   limit?: number;
