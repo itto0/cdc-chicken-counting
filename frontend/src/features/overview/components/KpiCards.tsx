@@ -24,8 +24,7 @@ export function KpiCards({ summary }: KpiCardsProps) {
     : "Offline";
 
   const accuracy = summary.detection_accuracy_pct;
-  const hasAccuracy =
-    (summary.total_count ?? 0) > 0 && accuracy != null && accuracy > 0;
+  const hasAccuracy = accuracy != null && accuracy > 0;
   const formattedAccuracy = hasAccuracy
     ? `${accuracy.toLocaleString("id-ID", {
         minimumFractionDigits: 1,

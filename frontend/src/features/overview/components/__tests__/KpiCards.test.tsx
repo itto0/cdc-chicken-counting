@@ -51,7 +51,7 @@ describe("KpiCards", () => {
     expect(accuracyCard?.textContent).toContain("98,5%");
   });
 
-  it("renders '-' for accuracy if total_count is 0 even if accuracy is provided", () => {
+  it("renders formatted accuracy when accuracy > 0 even if total_count is 0 (e.g. from model validation metrics)", () => {
     const summary: LineSummaryResponse = {
       ...baseSummary,
       total_count: 0,
@@ -61,8 +61,20 @@ describe("KpiCards", () => {
     render(<KpiCards summary={summary} />);
 
     const accuracyCard = screen.getByText("Akurasi Deteksi").closest("div");
+    expect(accuracyCard?.textContent).toContain("98,5%");
+  });
+
+  it("renders '-' for accuracy if detection_accuracy_pct is null or 0", () => {
+    const summary: LineSummaryResponse = {
+      ...baseSummary,
+      total_count: 50,
+      detection_accuracy_pct: 0,
+    };
+
+    render(<KpiCards summary={summary} />);
+
+    const accuracyCard = screen.getByText("Akurasi Deteksi").closest("div");
     expect(accuracyCard?.textContent).toContain("-");
-    expect(screen.queryByText("98,5%")).toBeNull();
   });
 
   it("renders '0' for speed when current_speed_cpm is undefined or null", () => {

@@ -28,7 +28,7 @@ const FALLBACK_SUMMARY: LineSummaryResponse = {
 
 export default function DashboardPage() {
   const { currentLineId, isConnected, lines } = useAppContext();
-  const { totalToday, liveSpeed, fps, latencyMs, reconnect } = useLiveStream(currentLineId);
+  const { totalToday, liveSpeed, fps, latencyMs, accuracyPct, reconnect } = useLiveStream(currentLineId);
   const [summary, setSummary] = useState<LineSummaryResponse>(FALLBACK_SUMMARY);
   const [aggregates, setAggregates] = useState<AggregateItemDTO[]>([]);
   const [retryNonce, setRetryNonce] = useState(0);
@@ -82,8 +82,12 @@ export default function DashboardPage() {
       target_attainment_pct: attainment,
       fps: fps > 0 ? fps : summary.fps,
       latency_p95_ms: latencyMs > 0 ? latencyMs : summary.latency_p95_ms,
+      detection_accuracy_pct:
+        accuracyPct != null && accuracyPct > 0
+          ? accuracyPct
+          : summary.detection_accuracy_pct,
     };
-  }, [summary, totalToday, liveSpeed, fps, latencyMs]);
+  }, [summary, totalToday, liveSpeed, fps, latencyMs, accuracyPct]);
 
   const previewUrl = useMemo(() => {
     if (!currentLineId) return "";
