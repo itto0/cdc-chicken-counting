@@ -20,17 +20,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/features/auth";
-import {
-  usersApi,
-  CreateUserModal,
-  EditUserModal,
-  ResetPasswordModal,
-  DeleteUserModal,
-  type UserItem,
-  type CreateUserPayload,
-  type UpdateUserPayload,
-  type AdminResetPasswordPayload,
-} from "../index";
+import { usersApi } from "../api/users.api";
+import { CreateUserModal } from "../components/CreateUserModal";
+import { EditUserModal } from "../components/EditUserModal";
+import { ResetPasswordModal } from "../components/ResetPasswordModal";
+import { DeleteUserModal } from "../components/DeleteUserModal";
+import type {
+  UserItem,
+  CreateUserPayload,
+  UpdateUserPayload,
+  AdminResetPasswordPayload,
+} from "../types";
 
 export function PenggunaPage() {
   const { user: currentUser } = useAuth();

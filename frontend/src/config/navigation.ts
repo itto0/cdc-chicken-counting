@@ -5,6 +5,7 @@ import {
   Bell,
   FileText,
   Settings as SettingsIcon,
+  Users,
 } from "lucide-react";
 
 export interface NavigationItem {
@@ -21,4 +22,5 @@ export const navigationConfig: NavigationItem[] = [
   { id: "alarm", label: "Alarm", path: "/alarm", icon: Bell },
   { id: "laporan", label: "Laporan", path: "/laporan", icon: FileText },
   { id: "pengaturan", label: "Pengaturan", path: "/pengaturan", icon: SettingsIcon, requiredRole: "admin" },
+  { id: "pengguna", label: "Pengguna", path: "/pengguna", icon: Users, requiredRole: "admin" },
 ];
