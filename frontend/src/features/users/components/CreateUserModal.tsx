@@ -28,6 +28,17 @@ export function CreateUserModal({ isOpen, onClose, onSubmit }: CreateUserModalPr
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isSubmitting) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isSubmitting, onClose]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: FormEvent) => {
@@ -56,7 +67,14 @@ export function CreateUserModal({ isOpen, onClose, onSubmit }: CreateUserModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isSubmitting) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+    >
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100 animate-in fade-in zoom-in duration-150">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div className="flex items-center gap-2">
@@ -68,7 +86,9 @@ export function CreateUserModal({ isOpen, onClose, onSubmit }: CreateUserModalPr
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+            disabled={isSubmitting}
+            aria-label="Tutup"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-5 h-5" />
           </button>

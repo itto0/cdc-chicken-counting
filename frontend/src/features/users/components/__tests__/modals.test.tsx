@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { CreateUserModal } from "../CreateUserModal";
 import { EditUserModal } from "../EditUserModal";
 import { ResetPasswordModal } from "../ResetPasswordModal";
@@ -105,6 +105,63 @@ describe("CreateUserModal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Batal" }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("dismisses on Escape key press", () => {
+    const onClose = vi.fn();
+    render(<CreateUserModal isOpen={true} onClose={onClose} onSubmit={vi.fn()} />);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("dismisses on backdrop click but not dialog content click", () => {
+    const onClose = vi.fn();
+    render(<CreateUserModal isOpen={true} onClose={onClose} onSubmit={vi.fn()} />);
+
+    // Click inside content
+    fireEvent.click(screen.getByText("Tambah Pengguna Baru"));
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Click backdrop
+    fireEvent.click(screen.getByRole("dialog"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables close button and prevents dismissal while submitting", async () => {
+    let resolveSubmit: () => void = () => {};
+    const onSubmit = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSubmit = resolve;
+        })
+    );
+    const onClose = vi.fn();
+    render(<CreateUserModal isOpen={true} onClose={onClose} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByPlaceholderText("Contoh: op_johndoe"), {
+      target: { value: "operator_new" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Minimal 6 karakter"), {
+      target: { value: "password123" },
+    });
+
+    const closeBtn = screen.getByRole("button", { name: "Tutup" });
+    expect((closeBtn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Simpan Pengguna" }));
+
+    // Is submitting
+    expect((closeBtn as HTMLButtonElement).disabled).toBe(true);
+
+    // Escape and backdrop click should not close while submitting
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(screen.getByRole("dialog"));
+    expect(onClose).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSubmit();
+    });
   });
 });
 
@@ -243,6 +300,66 @@ describe("EditUserModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Simpan Perubahan" }));
     expect(await screen.findByText("Database error")).toBeDefined();
   });
+
+  it("dismisses on Escape key press and backdrop click", () => {
+    const onClose = vi.fn();
+    render(
+      <EditUserModal
+        isOpen={true}
+        onClose={onClose}
+        user={dummyOperator}
+        currentUserId={1}
+        activeAdminCount={2}
+        onSubmit={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByText("Ubah Data Pengguna"));
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    onClose.mockClear();
+    fireEvent.click(screen.getByRole("dialog"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables close button and prevents dismissal while submitting", async () => {
+    let resolveSubmit: () => void = () => {};
+    const onSubmit = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSubmit = resolve;
+        })
+    );
+    const onClose = vi.fn();
+    render(
+      <EditUserModal
+        isOpen={true}
+        onClose={onClose}
+        user={dummyOperator}
+        currentUserId={1}
+        activeAdminCount={2}
+        onSubmit={onSubmit}
+      />
+    );
+
+    const closeBtn = screen.getByRole("button", { name: "Tutup" });
+    expect((closeBtn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Simpan Perubahan" }));
+
+    expect((closeBtn as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(screen.getByRole("dialog"));
+    expect(onClose).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSubmit();
+    });
+  });
 });
 
 describe("ResetPasswordModal", () => {
@@ -330,6 +447,56 @@ describe("ResetPasswordModal", () => {
 
     expect(await screen.findByText("Akses ditolak")).toBeDefined();
   });
+
+  it("dismisses on Escape key press and backdrop click", () => {
+    const onClose = vi.fn();
+    render(
+      <ResetPasswordModal isOpen={true} onClose={onClose} user={dummyUser} onSubmit={vi.fn()} />
+    );
+
+    fireEvent.click(screen.getByText("Reset Password Pengguna"));
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    onClose.mockClear();
+    fireEvent.click(screen.getByRole("dialog"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables close button and prevents dismissal while submitting", async () => {
+    let resolveSubmit: () => void = () => {};
+    const onSubmit = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSubmit = resolve;
+        })
+    );
+    const onClose = vi.fn();
+    render(
+      <ResetPasswordModal isOpen={true} onClose={onClose} user={dummyUser} onSubmit={onSubmit} />
+    );
+
+    const inputs = screen.getAllByPlaceholderText(/minimal 6 karakter|ulangi password baru/i);
+    fireEvent.change(inputs[0], { target: { value: "password123" } });
+    fireEvent.change(inputs[1], { target: { value: "password123" } });
+
+    const closeBtn = screen.getByRole("button", { name: "Tutup" });
+    expect((closeBtn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Simpan Password Baru" }));
+
+    expect((closeBtn as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(screen.getByRole("dialog"));
+    expect(onClose).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSubmit();
+    });
+  });
 });
 
 describe("DeleteUserModal", () => {
@@ -386,5 +553,73 @@ describe("DeleteUserModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Hapus Pengguna" }));
 
     expect(await screen.findByText("Tidak dapat menghapus admin aktif")).toBeDefined();
+  });
+
+  it("dismisses on Escape key press and backdrop click", () => {
+    const onClose = vi.fn();
+    render(
+      <DeleteUserModal isOpen={true} onClose={onClose} user={dummyUser} onConfirm={vi.fn()} />
+    );
+
+    fireEvent.click(screen.getByRole("heading", { name: "Hapus Pengguna" }));
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    onClose.mockClear();
+    fireEvent.click(screen.getByRole("dialog"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables close button and prevents dismissal while deleting", async () => {
+    let resolveDelete: () => void = () => {};
+    const onConfirm = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveDelete = resolve;
+        })
+    );
+    const onClose = vi.fn();
+    render(
+      <DeleteUserModal isOpen={true} onClose={onClose} user={dummyUser} onConfirm={onConfirm} />
+    );
+
+    const closeBtn = screen.getByRole("button", { name: "Tutup" });
+    expect((closeBtn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hapus Pengguna" }));
+
+    expect((closeBtn as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(screen.getByRole("dialog"));
+    expect(onClose).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveDelete();
+    });
+  });
+
+  it("clears previous error when reopened", async () => {
+    const onConfirm = vi.fn().mockRejectedValue(new Error("Tidak dapat menghapus"));
+    const { rerender } = render(
+      <DeleteUserModal isOpen={true} onClose={vi.fn()} user={dummyUser} onConfirm={onConfirm} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Hapus Pengguna" }));
+    expect(await screen.findByText("Tidak dapat menghapus")).toBeDefined();
+
+    // Close the modal
+    rerender(
+      <DeleteUserModal isOpen={false} onClose={vi.fn()} user={dummyUser} onConfirm={onConfirm} />
+    );
+    expect(screen.queryByText("Tidak dapat menghapus")).toBeNull();
+
+    // Reopen the modal
+    rerender(
+      <DeleteUserModal isOpen={true} onClose={vi.fn()} user={dummyUser} onConfirm={onConfirm} />
+    );
+    expect(screen.queryByText("Tidak dapat menghapus")).toBeNull();
   });
 });
