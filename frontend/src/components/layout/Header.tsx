@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Menu, Bell, User, LogOut } from "lucide-react";
+import { Menu, Bell, User, LogOut, KeyRound } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { alarmsApi } from "@/features/alarms";
 import { useAuth } from "@/features/auth";
+import { ChangePasswordModal } from "@/features/users";
 
 interface HeaderProps {
   onOpenSidebar: () => void;
@@ -10,6 +11,7 @@ interface HeaderProps {
 
 export function Header({ onOpenSidebar }: HeaderProps) {
   const [activeCount, setActiveCount] = useState(0);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -86,6 +88,17 @@ export function Header({ onOpenSidebar }: HeaderProps) {
           </div>
         </div>
 
+        {/* Change Password Button */}
+        <button
+          type="button"
+          onClick={() => setIsChangePasswordOpen(true)}
+          title="Ganti Password"
+          aria-label="Ganti Password"
+          className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 transition-colors cursor-pointer"
+        >
+          <KeyRound className="w-4 h-4" />
+        </button>
+
         {/* Logout Button */}
         <button
           type="button"
@@ -97,6 +110,11 @@ export function Header({ onOpenSidebar }: HeaderProps) {
           <LogOut className="w-4 h-4" />
         </button>
       </div>
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+      />
     </header>
   );
 }
