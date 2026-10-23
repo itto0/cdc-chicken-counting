@@ -300,3 +300,111 @@ def test_operator_forbidden_on_all_user_management(client):
     assert client.put("/api/v1/auth/users/1", json={"role": "admin"}, headers=headers).status_code == 403
     assert client.put("/api/v1/auth/users/1/password", json={"new_password": "newpassword123"}, headers=headers).status_code == 403
     assert client.delete("/api/v1/auth/users/1", headers=headers).status_code == 403
+
+
+def test_change_password_success(client):
+    token = get_token(client, "operator", "op123")
+    res = client.put(
+        "/api/v1/auth/password",
+        json={"current_password": "op123", "new_password": "new_op_password_456"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 200
+    assert res.json()["message"] == "Password changed successfully"
+
+    # Verify old password fails
+    res_old = client.post("/api/v1/auth/login", json={"username": "operator", "password": "op123"})
+    assert res_old.status_code == 401
+
+    # Verify new password works
+    res_new = client.post("/api/v1/auth/login", json={"username": "operator", "password": "new_op_password_456"})
+    assert res_new.status_code == 200
+
+
+def test_change_password_as_admin_success(client):
+    token = get_token(client, "admin", "admin123")
+    res = client.put(
+        "/api/v1/auth/password",
+        json={"current_password": "admin123", "new_password": "new_admin_password_789"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 200
+    assert res.json()["message"] == "Password changed successfully"
+
+    res_old = client.post("/api/v1/auth/login", json={"username": "admin", "password": "admin123"})
+    assert res_old.status_code == 401
+
+    res_new = client.post("/api/v1/auth/login", json={"username": "admin", "password": "new_admin_password_789"})
+    assert res_new.status_code == 200
+
+
+def test_change_password_wrong_current_password(client):
+    token = get_token(client, "operator", "op123")
+    res = client.put(
+        "/api/v1/auth/password",
+        json={"current_password": "wrong_password", "new_password": "new_op_password_456"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 400
+    assert "Current password is incorrect" in res.json()["detail"]
+
+
+def test_change_password_same_password_rejected(client):
+    token = get_token(client, "admin", "admin123")
+    res = client.put(
+        "/api/v1/auth/password",
+        json={"current_password": "admin123", "new_password": "admin123"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 400
+    assert "New password must be different from current password" in res.json()["detail"]
+
+
+def test_change_password_too_short(client):
+    token = get_token(client, "operator", "op123")
+    res = client.put(
+        "/api/v1/auth/password",
+        json={"current_password": "op123", "new_password": "123"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 422
+
+
+def test_change_password_via_api_key_not_found(client):
+    token = get_token(client, "admin", "admin123")
+    key_res = client.post(
+        "/api/v1/auth/api-keys",
+        json={"name": "test-key-pw", "role": "OPERATOR"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert key_res.status_code == 201
+    api_key = key_res.json()["api_key"]
+
+    res = client.put(
+        "/api/v1/auth/password",
+        json={"current_password": "op123", "new_password": "new_op_password_456"},
+        headers={"X-API-Key": api_key},
+    )
+    assert res.status_code == 404
+    assert "User not found" in res.json()["detail"]
+
+
+def test_create_user_username_strip_before_length_validation(client):
+    token = get_token(client, "admin", "admin123")
+    # "  ab  " has length 6 unstripped, but stripped is 2 chars (< min_length=3)
+    res_short = client.post(
+        "/api/v1/auth/users",
+        json={"username": "  ab  ", "password": "password123", "role": "operator"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res_short.status_code == 422
+
+    # "  gooduser  " stripped is "gooduser"
+    res_good = client.post(
+        "/api/v1/auth/users",
+        json={"username": "  gooduser  ", "password": "password123", "role": "operator"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res_good.status_code == 201
+    assert res_good.json()["username"] == "gooduser"
+

@@ -88,10 +88,11 @@ class UserCreateRequest(BaseModel):
     role: Literal["admin", "operator", "ADMIN", "OPERATOR"] = "operator"
     is_active: bool = True
 
-    @field_validator("username")
+    @field_validator("username", mode="before")
     @classmethod
     def validate_username(cls, v: str) -> str:
-        v = v.strip()
+        if isinstance(v, str):
+            v = v.strip()
         if not v:
             raise ValueError("Username cannot be empty")
         return v
@@ -115,6 +116,11 @@ class UserUpdateRequest(BaseModel):
 
 
 class AdminResetPasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
     new_password: str = Field(..., min_length=6, max_length=128)
 
 
@@ -186,6 +192,33 @@ def get_current_user(
         raise HTTPException(status_code=403, detail="User account is inactive")
 
     return UserDTO(id=user.id, username=user.username, role=user.role, is_active=user.is_active)
+
+
+@router.put("/password", response_model=dict)
+def change_self_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(get_current_user),
+):
+    if current_user.username.startswith("device:"):
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user = db.get(User, current_user.id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status_code=400,
+            detail="New password must be different from current password",
+        )
+
+    user.password_hash = hash_password(payload.new_password)
+    db.commit()
+    return {"message": "Password changed successfully"}
 
 
 def require_role(allowed_roles: list[str]) -> Callable[..., UserDTO]:
