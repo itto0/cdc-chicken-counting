@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from typing import Callable, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Header
-from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from services.api.src.db.models import User, ApiKey
 from services.api.src.db.session import get_db
@@ -12,6 +12,7 @@ from services.api.src.services.auth import (
     decode_access_token,
     hash_api_key,
     generate_api_key,
+    hash_password,
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -70,6 +71,51 @@ class ApiKeyResponse(BaseModel):
     is_active: bool
     created_at: datetime
     last_used_at: Optional[datetime] = None
+
+
+class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    role: str
+    is_active: bool
+
+
+class UserCreateRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=6, max_length=128)
+    role: Literal["admin", "operator", "ADMIN", "OPERATOR"] = "operator"
+    is_active: bool = True
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Username cannot be empty")
+        return v
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, v: str) -> str:
+        return v.strip().lower() if isinstance(v, str) else v
+
+
+class UserUpdateRequest(BaseModel):
+    role: Optional[Literal["admin", "operator", "ADMIN", "OPERATOR"]] = None
+    is_active: Optional[bool] = None
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        return v.strip().lower() if isinstance(v, str) else v
+
+
+class AdminResetPasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=6, max_length=128)
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -223,4 +269,151 @@ def revoke_api_key(
         created_at=key.created_at,
         last_used_at=key.last_used_at,
     )
+
+
+@router.get("/users", response_model=list[UserResponse])
+def list_users(
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(require_role(["admin"])),
+):
+    users = db.scalars(select(User).order_by(User.id)).all()
+    return [
+        UserResponse(
+            id=u.id,
+            username=u.username,
+            role=u.role.lower(),
+            is_active=u.is_active,
+        )
+        for u in users
+    ]
+
+
+@router.post("/users", response_model=UserResponse, status_code=201)
+def create_user(
+    payload: UserCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(require_role(["admin"])),
+):
+    existing = db.scalars(
+        select(User).where(func.lower(User.username) == payload.username.lower())
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    new_user = User(
+        username=payload.username,
+        password_hash=hash_password(payload.password),
+        role=payload.role.lower(),
+        is_active=payload.is_active,
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return UserResponse(
+        id=new_user.id,
+        username=new_user.username,
+        role=new_user.role.lower(),
+        is_active=new_user.is_active,
+    )
+
+
+@router.put("/users/{user_id}", response_model=UserResponse)
+def update_user(
+    user_id: int,
+    payload: UserUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(require_role(["admin"])),
+):
+    target_user = db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Invariant: Admin cannot deactivate their own account
+    if (
+        target_user.id == current_user.id
+        and not current_user.username.startswith("device:")
+        and payload.is_active is False
+    ):
+        raise HTTPException(status_code=400, detail="Cannot deactivate own account")
+
+    # Invariant: Cannot deactivate or demote last active admin
+    is_target_active_admin = (target_user.role.lower() == "admin") and target_user.is_active
+    will_be_demoted = payload.role is not None and payload.role.lower() != "admin"
+    will_be_deactivated = payload.is_active is False
+
+    if is_target_active_admin and (will_be_demoted or will_be_deactivated):
+        active_admin_count = db.scalar(
+            select(func.count(User.id)).where(
+                func.lower(User.role) == "admin",
+                User.is_active.is_(True),
+            )
+        )
+        if active_admin_count is not None and active_admin_count <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot deactivate or demote the last remaining active admin",
+            )
+
+    if payload.role is not None:
+        target_user.role = payload.role.lower()
+    if payload.is_active is not None:
+        target_user.is_active = payload.is_active
+
+    db.commit()
+    db.refresh(target_user)
+    return UserResponse(
+        id=target_user.id,
+        username=target_user.username,
+        role=target_user.role.lower(),
+        is_active=target_user.is_active,
+    )
+
+
+@router.put("/users/{user_id}/password", response_model=dict)
+def admin_reset_password(
+    user_id: int,
+    payload: AdminResetPasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(require_role(["admin"])),
+):
+    target_user = db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target_user.password_hash = hash_password(payload.new_password)
+    db.commit()
+    return {"message": "Password reset successfully"}
+
+
+@router.delete("/users/{user_id}", response_model=dict)
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(require_role(["admin"])),
+):
+    # Invariant: Admin cannot delete their own account
+    if user_id == current_user.id and not current_user.username.startswith("device:"):
+        raise HTTPException(status_code=400, detail="Cannot delete own account")
+
+    target_user = db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Invariant: Cannot delete the last remaining active admin
+    if target_user.role.lower() == "admin" and target_user.is_active:
+        active_admin_count = db.scalar(
+            select(func.count(User.id)).where(
+                func.lower(User.role) == "admin",
+                User.is_active.is_(True),
+            )
+        )
+        if active_admin_count is not None and active_admin_count <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete the last remaining active admin",
+            )
+
+    db.delete(target_user)
+    db.commit()
+    return {"message": "User deleted successfully"}
 
