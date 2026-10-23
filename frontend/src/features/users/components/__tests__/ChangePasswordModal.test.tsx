@@ -25,6 +25,10 @@ describe("ChangePasswordModal", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog).toBeDefined();
     expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.getAttribute("aria-labelledby")).toBe("change-password-modal-title");
+    expect(screen.getByRole("heading", { name: "Ganti Password Saya" }).id).toBe(
+      "change-password-modal-title"
+    );
     expect(screen.getByText("Ganti Password Saya")).toBeDefined();
     expect(screen.getByPlaceholderText("Masukkan password lama")).toBeDefined();
     expect(screen.getByPlaceholderText("Minimal 6 karakter")).toBeDefined();

@@ -408,3 +408,60 @@ def test_create_user_username_strip_before_length_validation(client):
     assert res_good.status_code == 201
     assert res_good.json()["username"] == "gooduser"
 
+
+def test_create_user_case_insensitive_duplicate_username(client):
+    token = get_token(client, "admin", "admin123")
+    res = client.post(
+        "/api/v1/auth/users",
+        json={"username": "OPERATOR", "password": "password123", "role": "operator"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 400
+    assert "Username already exists" in res.json()["detail"]
+
+
+def test_create_user_invalid_characters_in_username(client):
+    token = get_token(client, "admin", "admin123")
+    # Username with spaces and special character '!'
+    res = client.post(
+        "/api/v1/auth/users",
+        json={"username": "bad user!", "password": "password123", "role": "operator"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 422
+
+
+def test_change_password_current_password_exceeding_max_length(client):
+    token = get_token(client, "operator", "op123")
+    res = client.put(
+        "/api/v1/auth/password",
+        json={"current_password": "a" * 129, "new_password": "newpassword123"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 422
+
+
+def test_create_user_integrity_error_race_condition(client, monkeypatch):
+    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.orm import Session
+
+    token = get_token(client, "admin", "admin123")
+    real_commit = Session.commit
+
+    def fake_commit(self):
+        for obj in self.new:
+            if isinstance(obj, User):
+                raise IntegrityError("mock integrity error", "params", "orig")
+        return real_commit(self)
+
+    monkeypatch.setattr(Session, "commit", fake_commit)
+
+    res = client.post(
+        "/api/v1/auth/users",
+        json={"username": "raceuser", "password": "password123", "role": "operator"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 400
+    assert "Username already exists" in res.json()["detail"]
+
+

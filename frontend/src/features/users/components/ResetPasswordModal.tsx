@@ -67,6 +67,7 @@ export function ResetPasswordModal({ isOpen, onClose, user, onSubmit }: ResetPas
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby="reset-password-modal-title"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) onClose();
       }}
@@ -78,7 +79,7 @@ export function ResetPasswordModal({ isOpen, onClose, user, onSubmit }: ResetPas
             <div className="p-2 bg-amber-50 rounded-lg text-amber-600">
               <KeyRound className="w-5 h-5" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-900">Reset Password Pengguna</h2>
+            <h2 id="reset-password-modal-title" className="text-lg font-semibold text-slate-900">Reset Password Pengguna</h2>
           </div>
           <button
             type="button"

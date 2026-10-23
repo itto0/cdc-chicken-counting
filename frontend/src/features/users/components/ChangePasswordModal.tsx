@@ -90,6 +90,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby="change-password-modal-title"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) onClose();
       }}
@@ -101,7 +102,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
             <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
               <KeyRound className="w-5 h-5" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-900">Ganti Password Saya</h2>
+            <h2 id="change-password-modal-title" className="text-lg font-semibold text-slate-900">Ganti Password Saya</h2>
           </div>
           <button
             type="button"

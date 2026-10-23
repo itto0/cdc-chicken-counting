@@ -52,6 +52,7 @@ export function DeleteUserModal({ isOpen, onClose, user, onConfirm }: DeleteUser
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby="delete-user-modal-title"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isDeleting) onClose();
       }}
@@ -63,7 +64,7 @@ export function DeleteUserModal({ isOpen, onClose, user, onConfirm }: DeleteUser
             <div className="p-2 bg-rose-50 rounded-lg text-rose-600">
               <Trash2 className="w-5 h-5" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-900">Hapus Pengguna</h2>
+            <h2 id="delete-user-modal-title" className="text-lg font-semibold text-slate-900">Hapus Pengguna</h2>
           </div>
           <button
             type="button"

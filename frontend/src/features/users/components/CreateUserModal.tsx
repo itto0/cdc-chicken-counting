@@ -48,6 +48,10 @@ export function CreateUserModal({ isOpen, onClose, onSubmit }: CreateUserModalPr
       setErrorMsg("Nama pengguna tidak boleh kosong");
       return;
     }
+    if (cleanUsername.length < 3) {
+      setErrorMsg("Nama pengguna minimal 3 karakter");
+      return;
+    }
     if (password.length < 6) {
       setErrorMsg("Password minimal 6 karakter");
       return;
@@ -70,6 +74,7 @@ export function CreateUserModal({ isOpen, onClose, onSubmit }: CreateUserModalPr
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby="create-user-modal-title"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) onClose();
       }}
@@ -81,7 +86,7 @@ export function CreateUserModal({ isOpen, onClose, onSubmit }: CreateUserModalPr
             <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
               <UserPlus className="w-5 h-5" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-900">Tambah Pengguna Baru</h2>
+            <h2 id="create-user-modal-title" className="text-lg font-semibold text-slate-900">Tambah Pengguna Baru</h2>
           </div>
           <button
             type="button"

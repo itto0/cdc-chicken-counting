@@ -79,6 +79,7 @@ export function EditUserModal({
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby="edit-user-modal-title"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) onClose();
       }}
@@ -90,7 +91,7 @@ export function EditUserModal({
             <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
               <UserCog className="w-5 h-5" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-900">Ubah Data Pengguna</h2>
+            <h2 id="edit-user-modal-title" className="text-lg font-semibold text-slate-900">Ubah Data Pengguna</h2>
           </div>
           <button
             type="button"

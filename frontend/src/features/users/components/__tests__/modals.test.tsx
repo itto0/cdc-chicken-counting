@@ -17,6 +17,11 @@ describe("CreateUserModal", () => {
   it("renders form fields when isOpen is true", () => {
     render(<CreateUserModal isOpen={true} onClose={vi.fn()} onSubmit={vi.fn()} />);
 
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.getAttribute("aria-labelledby")).toBe("create-user-modal-title");
+    expect(screen.getByRole("heading", { name: "Tambah Pengguna Baru" }).id).toBe(
+      "create-user-modal-title"
+    );
     expect(screen.getByText("Tambah Pengguna Baru")).toBeDefined();
     expect(screen.getByPlaceholderText("Contoh: op_johndoe")).toBeDefined();
     expect(screen.getByPlaceholderText("Minimal 6 karakter")).toBeDefined();
@@ -36,6 +41,22 @@ describe("CreateUserModal", () => {
     fireEvent.click(submitBtn);
 
     expect(await screen.findByText("Nama pengguna tidak boleh kosong")).toBeDefined();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("shows validation error when username is less than 3 characters", async () => {
+    const onSubmit = vi.fn();
+    render(<CreateUserModal isOpen={true} onClose={vi.fn()} onSubmit={onSubmit} />);
+
+    const usernameInput = screen.getByPlaceholderText("Contoh: op_johndoe");
+    const passwordInput = screen.getByPlaceholderText("Minimal 6 karakter");
+    const submitBtn = screen.getByRole("button", { name: "Simpan Pengguna" });
+
+    fireEvent.change(usernameInput, { target: { value: "ab" } });
+    fireEvent.change(passwordInput, { target: { value: "123456" } });
+    fireEvent.click(submitBtn);
+
+    expect(await screen.findByText("Nama pengguna minimal 3 karakter")).toBeDefined();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -218,6 +239,12 @@ describe("EditUserModal", () => {
       />
     );
 
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.getAttribute("aria-labelledby")).toBe("edit-user-modal-title");
+    expect(screen.getByRole("heading", { name: "Ubah Data Pengguna" }).id).toBe(
+      "edit-user-modal-title"
+    );
+
     const checkbox = screen.getByRole("checkbox") as HTMLInputElement;
     expect(checkbox.disabled).toBe(true);
     expect(
@@ -388,6 +415,12 @@ describe("ResetPasswordModal", () => {
       <ResetPasswordModal isOpen={true} onClose={vi.fn()} user={dummyUser} onSubmit={onSubmit} />
     );
 
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.getAttribute("aria-labelledby")).toBe("reset-password-modal-title");
+    expect(screen.getByRole("heading", { name: "Reset Password Pengguna" }).id).toBe(
+      "reset-password-modal-title"
+    );
+
     const inputs = screen.getAllByPlaceholderText(/minimal 6 karakter|ulangi password baru/i);
     fireEvent.change(inputs[0], { target: { value: "123" } });
     fireEvent.change(inputs[1], { target: { value: "123" } });
@@ -524,7 +557,11 @@ describe("DeleteUserModal", () => {
       <DeleteUserModal isOpen={true} onClose={vi.fn()} user={dummyUser} onConfirm={vi.fn()} />
     );
 
-    expect(screen.getByRole("heading", { name: "Hapus Pengguna" })).toBeDefined();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.getAttribute("aria-labelledby")).toBe("delete-user-modal-title");
+    expect(screen.getByRole("heading", { name: "Hapus Pengguna" }).id).toBe(
+      "delete-user-modal-title"
+    );
     expect(screen.getByText('"doomed_user"')).toBeDefined();
   });
 

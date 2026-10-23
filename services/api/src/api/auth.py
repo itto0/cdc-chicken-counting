@@ -3,6 +3,7 @@ from typing import Callable, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from services.api.src.db.models import User, ApiKey
 from services.api.src.db.session import get_db
@@ -83,7 +84,7 @@ class UserResponse(BaseModel):
 
 
 class UserCreateRequest(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50)
+    username: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$")
     password: str = Field(..., min_length=6, max_length=128)
     role: Literal["admin", "operator", "ADMIN", "OPERATOR"] = "operator"
     is_active: bool = True
@@ -120,7 +121,7 @@ class AdminResetPasswordRequest(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
-    current_password: str = Field(..., min_length=1)
+    current_password: str = Field(..., min_length=1, max_length=128)
     new_password: str = Field(..., min_length=6, max_length=128)
 
 
@@ -340,7 +341,11 @@ def create_user(
         is_active=payload.is_active,
     )
     db.add(new_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Username already exists")
     db.refresh(new_user)
     return UserResponse(
         id=new_user.id,
