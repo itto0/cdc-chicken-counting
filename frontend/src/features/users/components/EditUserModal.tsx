@@ -1,0 +1,158 @@
+import { useState, useEffect, type FormEvent } from "react";
+import { X, UserCog, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import type { UserItem, UpdateUserPayload } from "../types";
+
+export interface EditUserModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  user: UserItem | null;
+  currentUserId: number | undefined;
+  activeAdminCount: number;
+  onSubmit: (userId: number, payload: UpdateUserPayload) => Promise<void>;
+}
+
+export function EditUserModal({
+  isOpen,
+  onClose,
+  user,
+  currentUserId,
+  activeAdminCount,
+  onSubmit,
+}: EditUserModalProps) {
+  const [role, setRole] = useState<"admin" | "operator">("operator");
+  const [isActive, setIsActive] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user && isOpen) {
+      setRole(user.role);
+      setIsActive(user.is_active);
+      setErrorMsg(null);
+      setIsSubmitting(false);
+    }
+  }, [user, isOpen]);
+
+  if (!isOpen || !user) return null;
+
+  const isSelf = user.id === currentUserId;
+  const isLastActiveAdmin = user.role === "admin" && user.is_active && activeAdminCount <= 1;
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (isSelf && !isActive) {
+      setErrorMsg("Anda tidak dapat menonaktifkan akun sendiri");
+      return;
+    }
+    if (isLastActiveAdmin && (role !== "admin" || !isActive)) {
+      setErrorMsg("Tidak dapat mengubah peran atau menonaktifkan satu-satunya admin aktif");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMsg(null);
+    try {
+      await onSubmit(user.id, { role, is_active: isActive });
+      onClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Gagal memperbarui pengguna";
+      setErrorMsg(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100 animate-in fade-in zoom-in duration-150">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+              <UserCog className="w-5 h-5" />
+            </div>
+            <h2 className="text-lg font-semibold text-slate-900">Ubah Data Pengguna</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {errorMsg && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-rose-700 text-sm">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+            <span className="text-slate-500 font-medium">Username: </span>
+            <span className="font-semibold text-slate-900">{user.username}</span>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Peran (Role)
+            </label>
+            <Select
+              value={role}
+              onChange={(e) => setRole(e.target.value as "admin" | "operator")}
+              disabled={isSubmitting || (isLastActiveAdmin && role === "admin")}
+            >
+              <option value="operator">Operator</option>
+              <option value="admin">Admin</option>
+            </Select>
+            {isLastActiveAdmin && (
+              <p className="text-xs text-amber-600 mt-1">
+                Peran tidak dapat diturunkan karena merupakan satu-satunya admin aktif.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Status Akun
+            </label>
+            <div className="flex items-center gap-3 pt-1">
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isActive}
+                  onChange={(e) => setIsActive(e.target.checked)}
+                  disabled={isSubmitting || isSelf || isLastActiveAdmin}
+                  className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 disabled:opacity-50"
+                />
+                <span className="text-sm font-medium text-slate-700">Akun Aktif</span>
+              </label>
+            </div>
+            {isSelf && (
+              <p className="text-xs text-amber-600 mt-1">
+                Anda tidak dapat menonaktifkan akun yang sedang digunakan saat ini.
+              </p>
+            )}
+            {!isSelf && isLastActiveAdmin && (
+              <p className="text-xs text-amber-600 mt-1">
+                Akun ini tidak dapat dinonaktifkan karena merupakan satu-satunya admin aktif.
+              </p>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              Batal
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
