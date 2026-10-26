@@ -18,6 +18,8 @@ class Line(Base):
     line_direction: Mapped[str] = mapped_column(String(20), default="down")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    rate_warning_threshold: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    rate_critical_threshold: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
 
     def __repr__(self) -> str:
         return f"<Line(id='{self.id}', name='{self.name}', daily_target={self.daily_target}, is_active={self.is_active})>"
