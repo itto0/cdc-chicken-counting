@@ -88,17 +88,6 @@ export function Header({ onOpenSidebar }: HeaderProps) {
           </div>
         </div>
 
-        {/* Change Password Button */}
-        <button
-          type="button"
-          onClick={() => setIsChangePasswordOpen(true)}
-          title="Ganti Password"
-          aria-label="Ganti Password"
-          className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 transition-colors cursor-pointer"
-        >
-          <KeyRound className="w-4 h-4" />
-        </button>
-
         {/* Logout Button */}
         <button
           type="button"
