@@ -58,6 +58,12 @@ export default function PengaturanPage() {
   const [videoUrl, setVideoUrl] = useState(currentLine?.video_url || "");
   const [lineCoords, setLineCoords] = useState(currentLine?.line_coords || "0,240,640,240");
   const [lineDirection, setLineDirection] = useState(currentLine?.line_direction || "down");
+  const [rateWarning, setRateWarning] = useState<number | string>(
+    currentLine?.rate_warning_threshold ?? ""
+  );
+  const [rateCritical, setRateCritical] = useState<number | string>(
+    currentLine?.rate_critical_threshold ?? ""
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -81,6 +87,8 @@ export default function PengaturanPage() {
       setVideoUrl(currentLine.video_url || "");
       setLineCoords(currentLine.line_coords || "0,240,640,240");
       setLineDirection(currentLine.line_direction || "down");
+      setRateWarning(currentLine.rate_warning_threshold ?? "");
+      setRateCritical(currentLine.rate_critical_threshold ?? "");
       setSaveError(null);
     }
   }, [currentLine]);
@@ -109,6 +117,22 @@ export default function PengaturanPage() {
       }
     }
 
+    const warningVal = rateWarning === "" ? null : Number(rateWarning);
+    const criticalVal = rateCritical === "" ? null : Number(rateCritical);
+
+    if (warningVal !== null && (isNaN(warningVal) || warningVal <= 0)) {
+      setSaveError("Ambang batas peringatan harus lebih besar dari 0");
+      return;
+    }
+    if (criticalVal !== null && (isNaN(criticalVal) || criticalVal <= 0)) {
+      setSaveError("Ambang batas kritis harus lebih besar dari 0");
+      return;
+    }
+    if (warningVal !== null && criticalVal !== null && criticalVal >= warningVal) {
+      setSaveError("Ambang batas kritis harus lebih kecil dari ambang batas peringatan");
+      return;
+    }
+
     setIsSaving(true);
     try {
       await updateLine(currentLine.id, {
@@ -117,6 +141,8 @@ export default function PengaturanPage() {
         video_url: videoUrl.trim() || null,
         line_coords: lineCoords.trim() || null,
         line_direction: lineDirection,
+        rate_warning_threshold: warningVal,
+        rate_critical_threshold: criticalVal,
       });
       setIsSaved(true);
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -274,6 +300,66 @@ export default function PengaturanPage() {
                   <option value="in">Masuk (In)</option>
                   <option value="out">Keluar (Out)</option>
                 </Select>
+              </div>
+
+              <div className="border-t border-slate-100 pt-4 mt-2 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-semibold text-slate-800">
+                      Ambang Batas Kecepatan (Speed Thresholds)
+                    </h4>
+                    <p className="text-[11px] text-slate-400">
+                      Kosongkan untuk mengikuti standar sistem (130 /mnt warning, 110 /mnt critical).
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRateWarning("");
+                      setRateCritical("");
+                    }}
+                    className="text-[11px] text-slate-500 hover:text-slate-800 underline transition-colors cursor-pointer"
+                  >
+                    Gunakan Standar Sistem
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      htmlFor="rate-warning-input"
+                      className="text-xs font-medium text-slate-700 block mb-1"
+                    >
+                      Peringatan / Warning (ekor/menit)
+                    </label>
+                    <Input
+                      id="rate-warning-input"
+                      type="number"
+                      value={rateWarning}
+                      onChange={(e) => setRateWarning(e.target.value === "" ? "" : Number(e.target.value))}
+                      placeholder="130.0 (Standar)"
+                      min={1}
+                      step="any"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="rate-critical-input"
+                      className="text-xs font-medium text-slate-700 block mb-1"
+                    >
+                      Kritis / Critical (ekor/menit)
+                    </label>
+                    <Input
+                      id="rate-critical-input"
+                      type="number"
+                      value={rateCritical}
+                      onChange={(e) => setRateCritical(e.target.value === "" ? "" : Number(e.target.value))}
+                      placeholder="110.0 (Standar)"
+                      min={1}
+                      step="any"
+                    />
+                  </div>
+                </div>
               </div>
             </CardContent>
             <CardFooter className="flex justify-between items-center">

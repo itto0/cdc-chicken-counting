@@ -3,33 +3,41 @@ export type UserRole = "ADMIN" | "MANAGER" | "OPERATOR" | "VIEWER";
 export interface Line {
   id: string;
   name: string;
-  daily_target: number;
+  daily_target?: number;
+  is_active: boolean;
   video_url?: string | null;
   line_coords?: string | null;
   line_direction?: string;
-  is_active?: boolean;
   status?: string;
   last_ping?: string | null;
   total_today?: number;
+  rate_warning_threshold?: number | null;
+  rate_critical_threshold?: number | null;
+  effective_rate_warning?: number;
+  effective_rate_critical?: number;
 }
 
 export interface CreateLinePayload {
   id: string;
   name: string;
-  daily_target: number;
-  video_url?: string;
-  line_coords?: string;
-  line_direction?: string;
-  is_active?: boolean;
-}
-
-export interface UpdateLinePayload {
-  name?: string;
   daily_target?: number;
   video_url?: string | null;
   line_coords?: string | null;
   line_direction?: string;
   is_active?: boolean;
+  rate_warning_threshold?: number | null;
+  rate_critical_threshold?: number | null;
+}
+
+export interface UpdateLinePayload {
+  name?: string;
+  daily_target?: number;
+  is_active?: boolean;
+  video_url?: string | null;
+  line_coords?: string | null;
+  line_direction?: string;
+  rate_warning_threshold?: number | null;
+  rate_critical_threshold?: number | null;
 }
 
 export type LineItem = Line;
