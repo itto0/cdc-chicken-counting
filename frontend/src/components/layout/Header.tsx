@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Menu, Bell, User, LogOut, KeyRound } from "lucide-react";
+import { Menu, Bell, User, LogOut } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { alarmsApi } from "@/features/alarms";
 import { useAuth } from "@/features/auth";
