@@ -75,8 +75,8 @@ class AlarmEvaluator:
         Uses line-specific overrides when provided, falling back to system defaults
         (DEFAULT_RATE_WARNING = 130.0, DEFAULT_RATE_CRITICAL = 110.0).
 
-        When rate returns to normal (>= warning threshold), any OPEN LOW_RATE alarm
-        for this line is auto-resolved.
+        When rate returns to normal (>= warning threshold), any OPEN or ACKNOWLEDGED
+        LOW_RATE alarm for this line is auto-resolved.
         """
         warning = warning_threshold if warning_threshold is not None else DEFAULT_RATE_WARNING
         critical = critical_threshold if critical_threshold is not None else DEFAULT_RATE_CRITICAL
@@ -86,15 +86,20 @@ class AlarmEvaluator:
         elif rate_per_min < warning:
             severity = "WARNING"
         else:
-            # Auto-resolve existing open LOW_RATE alarm for this line if present
-            open_alarm = (
+            # Auto-resolve existing active (OPEN or ACKNOWLEDGED) LOW_RATE alarms for this line
+            active_alarms = (
                 self.db.query(Alarm)
-                .filter_by(line_id=line_id, alarm_type="LOW_RATE", status="OPEN")
-                .first()
+                .filter(
+                    Alarm.line_id == line_id,
+                    Alarm.alarm_type == "LOW_RATE",
+                    Alarm.status.in_(["OPEN", "ACKNOWLEDGED"]),
+                )
+                .all()
             )
-            if open_alarm is not None:
-                open_alarm.status = "RESOLVED"
-                open_alarm.resolved_at = datetime.now(timezone.utc)
+            for alarm in active_alarms:
+                alarm.status = "RESOLVED"
+                alarm.resolved_at = datetime.now(timezone.utc)
+            if active_alarms:
                 self.db.commit()
             return None
 

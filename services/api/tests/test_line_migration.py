@@ -61,3 +61,27 @@ def test_init_db_migrates_existing_lines_table(tmp_path):
         assert line is not None
         assert line.rate_warning_threshold is None
         assert line.rate_critical_threshold is None
+
+    # Calling init_db again on the migrated db must be fully idempotent
+    init_db(target_engine=engine)
+
+
+def test_init_db_idempotency_multiple_calls(tmp_path):
+    db_file = tmp_path / "test_idempotent.db"
+    engine = create_engine(f"sqlite:///{db_file}")
+
+    # Call init_db first time (creates tables, columns, seed rows)
+    init_db(target_engine=engine)
+
+    # Call init_db second and third time (must be idempotent without throwing errors)
+    init_db(target_engine=engine)
+    init_db(target_engine=engine)
+
+    with Session(engine) as session:
+        lines = session.query(Line).all()
+        assert len(lines) >= 2
+        line1 = session.get(Line, "line-1")
+        assert line1 is not None
+        assert line1.rate_warning_threshold is None
+        assert line1.rate_critical_threshold is None
+

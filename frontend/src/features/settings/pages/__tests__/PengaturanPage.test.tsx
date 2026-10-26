@@ -84,4 +84,38 @@ describe("PengaturanPage Thresholds", () => {
     });
     expect(mockUpdateLine).not.toHaveBeenCalled();
   });
+
+  it("shows error if single-sided warning threshold is less than or equal to default critical (110)", async () => {
+    render(<PengaturanPage />);
+    const warningInput = screen.getByLabelText(/Peringatan.*Warning/i) as HTMLInputElement;
+    const criticalInput = screen.getByLabelText(/Kritis.*Critical/i) as HTMLInputElement;
+    const submitBtn = screen.getByRole("button", { name: /Simpan Konfigurasi/i });
+
+    // Warning 100 with empty critical (effective critical = 110 >= warning 100)
+    fireEvent.change(warningInput, { target: { value: "100" } });
+    fireEvent.change(criticalInput, { target: { value: "" } });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Ambang batas kritis harus lebih kecil dari ambang batas peringatan/i)).toBeDefined();
+    });
+    expect(mockUpdateLine).not.toHaveBeenCalled();
+  });
+
+  it("shows error if single-sided critical threshold is greater than or equal to default warning (130)", async () => {
+    render(<PengaturanPage />);
+    const warningInput = screen.getByLabelText(/Peringatan.*Warning/i) as HTMLInputElement;
+    const criticalInput = screen.getByLabelText(/Kritis.*Critical/i) as HTMLInputElement;
+    const submitBtn = screen.getByRole("button", { name: /Simpan Konfigurasi/i });
+
+    // Critical 135 with empty warning (critical 135 >= effective warning 130)
+    fireEvent.change(warningInput, { target: { value: "" } });
+    fireEvent.change(criticalInput, { target: { value: "135" } });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Ambang batas kritis harus lebih kecil dari ambang batas peringatan/i)).toBeDefined();
+    });
+    expect(mockUpdateLine).not.toHaveBeenCalled();
+  });
 });

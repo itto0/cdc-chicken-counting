@@ -58,11 +58,11 @@ export default function PengaturanPage() {
   const [videoUrl, setVideoUrl] = useState(currentLine?.video_url || "");
   const [lineCoords, setLineCoords] = useState(currentLine?.line_coords || "0,240,640,240");
   const [lineDirection, setLineDirection] = useState(currentLine?.line_direction || "down");
-  const [rateWarning, setRateWarning] = useState<number | string>(
-    currentLine?.rate_warning_threshold ?? ""
+  const [rateWarning, setRateWarning] = useState<string>(
+    currentLine?.rate_warning_threshold != null ? String(currentLine.rate_warning_threshold) : ""
   );
-  const [rateCritical, setRateCritical] = useState<number | string>(
-    currentLine?.rate_critical_threshold ?? ""
+  const [rateCritical, setRateCritical] = useState<string>(
+    currentLine?.rate_critical_threshold != null ? String(currentLine.rate_critical_threshold) : ""
   );
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -87,8 +87,16 @@ export default function PengaturanPage() {
       setVideoUrl(currentLine.video_url || "");
       setLineCoords(currentLine.line_coords || "0,240,640,240");
       setLineDirection(currentLine.line_direction || "down");
-      setRateWarning(currentLine.rate_warning_threshold ?? "");
-      setRateCritical(currentLine.rate_critical_threshold ?? "");
+      setRateWarning(
+        currentLine.rate_warning_threshold != null
+          ? String(currentLine.rate_warning_threshold)
+          : ""
+      );
+      setRateCritical(
+        currentLine.rate_critical_threshold != null
+          ? String(currentLine.rate_critical_threshold)
+          : ""
+      );
       setSaveError(null);
     }
   }, [currentLine]);
@@ -117,18 +125,23 @@ export default function PengaturanPage() {
       }
     }
 
-    const warningVal = rateWarning === "" ? null : Number(rateWarning);
-    const criticalVal = rateCritical === "" ? null : Number(rateCritical);
+    const warningTrimmed = rateWarning.trim();
+    const criticalTrimmed = rateCritical.trim();
+    const warningVal = warningTrimmed === "" ? null : Number(warningTrimmed);
+    const criticalVal = criticalTrimmed === "" ? null : Number(criticalTrimmed);
 
-    if (warningVal !== null && (isNaN(warningVal) || warningVal <= 0)) {
+    if (warningVal !== null && (isNaN(warningVal) || !isFinite(warningVal) || warningVal <= 0)) {
       setSaveError("Ambang batas peringatan harus lebih besar dari 0");
       return;
     }
-    if (criticalVal !== null && (isNaN(criticalVal) || criticalVal <= 0)) {
+    if (criticalVal !== null && (isNaN(criticalVal) || !isFinite(criticalVal) || criticalVal <= 0)) {
       setSaveError("Ambang batas kritis harus lebih besar dari 0");
       return;
     }
-    if (warningVal !== null && criticalVal !== null && criticalVal >= warningVal) {
+
+    const effWarning = warningVal !== null ? warningVal : 130;
+    const effCritical = criticalVal !== null ? criticalVal : 110;
+    if (effCritical >= effWarning) {
       setSaveError("Ambang batas kritis harus lebih kecil dari ambang batas peringatan");
       return;
     }
@@ -336,7 +349,7 @@ export default function PengaturanPage() {
                       id="rate-warning-input"
                       type="number"
                       value={rateWarning}
-                      onChange={(e) => setRateWarning(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={(e) => setRateWarning(e.target.value)}
                       placeholder="130.0 (Standar)"
                       min={1}
                       step="any"
@@ -353,7 +366,7 @@ export default function PengaturanPage() {
                       id="rate-critical-input"
                       type="number"
                       value={rateCritical}
-                      onChange={(e) => setRateCritical(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={(e) => setRateCritical(e.target.value)}
                       placeholder="110.0 (Standar)"
                       min={1}
                       step="any"

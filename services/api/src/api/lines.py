@@ -101,8 +101,20 @@ class LineCreatePayload(BaseModel):
             raise ValueError("rate_warning_threshold must be greater than 0")
         if c is not None and not (math.isfinite(c) and c > 0):
             raise ValueError("rate_critical_threshold must be greater than 0")
-        if w is not None and c is not None and c >= w:
-            raise ValueError("rate_critical_threshold must be strictly less than rate_warning_threshold")
+        eff_w = w if w is not None else DEFAULT_RATE_WARNING
+        eff_c = c if c is not None else DEFAULT_RATE_CRITICAL
+        if eff_c >= eff_w:
+            if w is not None and c is None:
+                raise ValueError(
+                    f"rate_warning_threshold must be strictly greater than default rate_critical_threshold ({DEFAULT_RATE_CRITICAL})"
+                )
+            if c is not None and w is None:
+                raise ValueError(
+                    f"rate_critical_threshold must be strictly less than default rate_warning_threshold ({DEFAULT_RATE_WARNING})"
+                )
+            raise ValueError(
+                "rate_critical_threshold must be strictly less than rate_warning_threshold"
+            )
         return self
 
 
@@ -370,11 +382,9 @@ def update_line(
         if "rate_critical_threshold" in fields_set
         else line.rate_critical_threshold
     )
-    if (
-        target_warning is not None
-        and target_critical is not None
-        and target_critical >= target_warning
-    ):
+    eff_w = target_warning if target_warning is not None else DEFAULT_RATE_WARNING
+    eff_c = target_critical if target_critical is not None else DEFAULT_RATE_CRITICAL
+    if eff_c >= eff_w:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="rate_critical_threshold must be strictly less than rate_warning_threshold",

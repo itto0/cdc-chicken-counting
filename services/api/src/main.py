@@ -41,21 +41,15 @@ def init_db(target_engine=None) -> None:
 
     # Check and migrate columns on lines table
     try:
-        with eng.connect() as connection:
-            line_cols = [
-                row[1]
-                for row in connection.execute(text("PRAGMA table_info(lines)")).fetchall()
-            ]
-            if line_cols and "rate_warning_threshold" not in line_cols:
-                connection.execute(
-                    text("ALTER TABLE lines ADD COLUMN rate_warning_threshold REAL NULL")
-                )
-                connection.commit()
-            if line_cols and "rate_critical_threshold" not in line_cols:
-                connection.execute(
-                    text("ALTER TABLE lines ADD COLUMN rate_critical_threshold REAL NULL")
-                )
-                connection.commit()
+        inspector = inspect(eng)
+        if "lines" in inspector.get_table_names():
+            line_cols = [c["name"] for c in inspector.get_columns("lines")]
+            with eng.connect() as conn:
+                if "rate_warning_threshold" not in line_cols:
+                    conn.execute(text("ALTER TABLE lines ADD COLUMN rate_warning_threshold REAL NULL"))
+                if "rate_critical_threshold" not in line_cols:
+                    conn.execute(text("ALTER TABLE lines ADD COLUMN rate_critical_threshold REAL NULL"))
+                conn.commit()
     except Exception:
         pass
 

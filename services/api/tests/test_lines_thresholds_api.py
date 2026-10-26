@@ -277,3 +277,45 @@ def test_put_line_rejects_non_positive_and_non_finite_thresholds(client: TestCli
     for non_finite in ["nan", "-nan", "inf", "-inf", "infinity", "-infinity"]:
         assert client.put("/api/v1/lines/line-put-val", json={"rate_warning_threshold": non_finite}).status_code == 422
         assert client.put("/api/v1/lines/line-put-val", json={"rate_critical_threshold": non_finite}).status_code == 422
+
+
+def test_single_sided_threshold_inversion_fails(client: TestClient):
+    # Single-sided POST: warning <= default critical (110.0)
+    res_post_warn = client.post("/api/v1/lines", json={
+        "id": "line-single-warn",
+        "name": "Single Warn Inverted",
+        "rate_warning_threshold": 100.0,
+    })
+    assert res_post_warn.status_code == 422
+    assert "rate_warning_threshold must be strictly greater than default rate_critical_threshold (110.0)" in str(res_post_warn.json())
+
+    # Single-sided POST: critical >= default warning (130.0)
+    res_post_crit = client.post("/api/v1/lines", json={
+        "id": "line-single-crit",
+        "name": "Single Crit Inverted",
+        "rate_critical_threshold": 135.0,
+    })
+    assert res_post_crit.status_code == 422
+    assert "rate_critical_threshold must be strictly less than default rate_warning_threshold (130.0)" in str(res_post_crit.json())
+
+    # Create line with default thresholds
+    res_default = client.post("/api/v1/lines", json={
+        "id": "line-default-inverted",
+        "name": "Default Inversion Target",
+    })
+    assert res_default.status_code == 201
+
+    # Single-sided PUT: warning to 100 on default line (effective critical is 110.0) -> fails 422
+    res_put_warn = client.put("/api/v1/lines/line-default-inverted", json={
+        "rate_warning_threshold": 100.0,
+    })
+    assert res_put_warn.status_code == 422
+    assert "rate_critical_threshold must be strictly less than rate_warning_threshold" in res_put_warn.json()["detail"]
+
+    # Single-sided PUT: critical to 135 on default line (effective warning is 130.0) -> fails 422
+    res_put_crit = client.put("/api/v1/lines/line-default-inverted", json={
+        "rate_critical_threshold": 135.0,
+    })
+    assert res_put_crit.status_code == 422
+    assert "rate_critical_threshold must be strictly less than rate_warning_threshold" in res_put_crit.json()["detail"]
+

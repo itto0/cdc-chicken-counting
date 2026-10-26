@@ -374,3 +374,27 @@ def test_alarm_evaluator_auto_resolves_low_rate_with_custom_threshold(db_session
     assert saved.resolved_at is not None
 
 
+def test_alarm_evaluator_auto_resolves_acknowledged_low_rate_on_recovery(db_session: Session):
+    evaluator = AlarmEvaluator(db=db_session)
+
+    # 1. Trigger WARNING alarm at 120.0
+    alarm = evaluator.evaluate_rate(line_id="lineAck", rate_per_min=120.0)
+    assert alarm is not None
+    assert alarm.status == "OPEN"
+
+    # 2. Simulate operator acknowledging the alarm
+    alarm.status = "ACKNOWLEDGED"
+    db_session.commit()
+
+    # 3. Rate recovers to normal (>= 130.0)
+    recovered = evaluator.evaluate_rate(line_id="lineAck", rate_per_min=135.0)
+    assert recovered is None
+
+    # 4. Verify the ACKNOWLEDGED alarm is now RESOLVED
+    saved = db_session.query(Alarm).filter_by(line_id="lineAck", alarm_type="LOW_RATE").first()
+    assert saved is not None
+    assert saved.status == "RESOLVED"
+    assert saved.resolved_at is not None
+
+
+
