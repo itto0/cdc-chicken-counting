@@ -7,7 +7,7 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen flex bg-slate-50 text-slate-900 font-sans">
+    <div className="h-screen flex bg-slate-50 text-slate-900 font-sans">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
         <Header onOpenSidebar={() => setSidebarOpen(true)} />
