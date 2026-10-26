@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Literal
-from pydantic import BaseModel, Field
+from typing import Any, Literal
+from pydantic import BaseModel, Field, model_validator
 
 
 class CountEventDTO(BaseModel):
@@ -37,11 +37,36 @@ class SyncBatchPayload(BaseModel):
 
 
 class LineConfigDTO(BaseModel):
-    line_id: str
+    id: str = ""
+    name: str = ""
+    daily_target: int = 60000
+    is_active: bool = True
+    video_url: str | None = None
+    line_coords: str | None = None
+    line_direction: str = "down"
+    rate_warning_threshold: float | None = None
+    rate_critical_threshold: float | None = None
+
+    # Backward compatibility with legacy callers and contracts tests
+    line_id: str | None = None
     line_name: str = ""
     direction: str = "IN"
     coordinates: list[list[int]] = Field(default_factory=list)
     status: str = "ACTIVE"
+
+    @model_validator(mode="before")
+    @classmethod
+    def sync_legacy_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "line_id" in data and not data.get("id"):
+                data["id"] = data["line_id"]
+            elif "id" in data and not data.get("line_id"):
+                data["line_id"] = data["id"]
+            if "line_name" in data and not data.get("name"):
+                data["name"] = data["line_name"]
+            elif "name" in data and not data.get("line_name"):
+                data["line_name"] = data["name"]
+        return data
 
 
 class AlarmDTO(BaseModel):

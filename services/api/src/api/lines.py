@@ -3,7 +3,7 @@ import re
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -15,6 +15,9 @@ from shared.time_utils import get_jakarta_today_bounds_utc
 router = APIRouter(prefix="/api/v1/lines", tags=["lines"])
 
 VALID_DIRECTIONS = ("down", "up", "left", "right", "in", "out")
+
+DEFAULT_RATE_WARNING = 130.0
+DEFAULT_RATE_CRITICAL = 110.0
 
 
 def validate_coords_format(coords: Optional[str]) -> Optional[str]:
@@ -41,6 +44,8 @@ class LineCreatePayload(BaseModel):
     line_coords: Optional[str] = Field(None, max_length=100)
     line_direction: str = Field("down")
     is_active: bool = True
+    rate_warning_threshold: float | None = None
+    rate_critical_threshold: float | None = None
 
     @field_validator("name")
     @classmethod
@@ -71,6 +76,18 @@ class LineCreatePayload(BaseModel):
             raise ValueError(f"line_direction must be one of {VALID_DIRECTIONS}")
         return v
 
+    @model_validator(mode="after")
+    def validate_thresholds(self):
+        w = self.rate_warning_threshold
+        c = self.rate_critical_threshold
+        if w is not None and w <= 0:
+            raise ValueError("rate_warning_threshold must be greater than 0")
+        if c is not None and c <= 0:
+            raise ValueError("rate_critical_threshold must be greater than 0")
+        if w is not None and c is not None and c >= w:
+            raise ValueError("rate_critical_threshold must be strictly less than rate_warning_threshold")
+        return self
+
 
 class LineUpdatePayload(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
@@ -79,6 +96,8 @@ class LineUpdatePayload(BaseModel):
     line_coords: Optional[str] = Field(None, max_length=100)
     line_direction: Optional[str] = None
     is_active: Optional[bool] = None
+    rate_warning_threshold: float | None = None
+    rate_critical_threshold: float | None = None
 
     @field_validator("name")
     @classmethod
@@ -105,6 +124,18 @@ class LineUpdatePayload(BaseModel):
             raise ValueError(f"line_direction must be one of {VALID_DIRECTIONS}")
         return v
 
+    @model_validator(mode="after")
+    def validate_thresholds(self):
+        w = self.rate_warning_threshold
+        c = self.rate_critical_threshold
+        if w is not None and w <= 0:
+            raise ValueError("rate_warning_threshold must be greater than 0")
+        if c is not None and c <= 0:
+            raise ValueError("rate_critical_threshold must be greater than 0")
+        if w is not None and c is not None and c >= w:
+            raise ValueError("rate_critical_threshold must be strictly less than rate_warning_threshold")
+        return self
+
 
 class LineStatusDTO(BaseModel):
     id: str
@@ -117,6 +148,10 @@ class LineStatusDTO(BaseModel):
     status: str
     last_ping: Optional[str] = None
     total_today: int
+    rate_warning_threshold: float | None = None
+    rate_critical_threshold: float | None = None
+    effective_rate_warning: float = DEFAULT_RATE_WARNING
+    effective_rate_critical: float = DEFAULT_RATE_CRITICAL
 
 
 class LineDetailDTO(BaseModel):
@@ -127,6 +162,36 @@ class LineDetailDTO(BaseModel):
     line_coords: Optional[str] = None
     line_direction: str = "down"
     is_active: bool
+    rate_warning_threshold: float | None = None
+    rate_critical_threshold: float | None = None
+    effective_rate_warning: float = DEFAULT_RATE_WARNING
+    effective_rate_critical: float = DEFAULT_RATE_CRITICAL
+
+
+def line_to_detail_dto(line: Line) -> LineDetailDTO:
+    eff_warning = (
+        line.rate_warning_threshold
+        if line.rate_warning_threshold is not None
+        else DEFAULT_RATE_WARNING
+    )
+    eff_critical = (
+        line.rate_critical_threshold
+        if line.rate_critical_threshold is not None
+        else DEFAULT_RATE_CRITICAL
+    )
+    return LineDetailDTO(
+        id=line.id,
+        name=line.name,
+        daily_target=line.daily_target,
+        video_url=line.video_url,
+        line_coords=line.line_coords,
+        line_direction=line.line_direction or "down",
+        is_active=line.is_active,
+        rate_warning_threshold=line.rate_warning_threshold,
+        rate_critical_threshold=line.rate_critical_threshold,
+        effective_rate_warning=eff_warning,
+        effective_rate_critical=eff_critical,
+    )
 
 
 @router.post("", response_model=LineDetailDTO, status_code=status.HTTP_201_CREATED)
@@ -150,6 +215,8 @@ def create_line(
         line_coords=payload.line_coords,
         line_direction=payload.line_direction,
         is_active=payload.is_active,
+        rate_warning_threshold=payload.rate_warning_threshold,
+        rate_critical_threshold=payload.rate_critical_threshold,
     )
     try:
         db.add(new_line)
@@ -161,15 +228,7 @@ def create_line(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Line with ID '{payload.id}' already exists",
         )
-    return LineDetailDTO(
-        id=new_line.id,
-        name=new_line.name,
-        daily_target=new_line.daily_target,
-        video_url=new_line.video_url,
-        line_coords=new_line.line_coords,
-        line_direction=new_line.line_direction or "down",
-        is_active=new_line.is_active,
-    )
+    return line_to_detail_dto(new_line)
 
 
 @router.get("", response_model=list[LineStatusDTO])
@@ -209,6 +268,17 @@ def list_lines(
             .where(CountEvent.ts_utc <= today_end_utc)
         ) or 0
 
+        eff_warning = (
+            line.rate_warning_threshold
+            if line.rate_warning_threshold is not None
+            else DEFAULT_RATE_WARNING
+        )
+        eff_critical = (
+            line.rate_critical_threshold
+            if line.rate_critical_threshold is not None
+            else DEFAULT_RATE_CRITICAL
+        )
+
         result.append(
             LineStatusDTO(
                 id=line.id,
@@ -221,6 +291,10 @@ def list_lines(
                 status=status_str,
                 last_ping=last_ping_str,
                 total_today=count,
+                rate_warning_threshold=line.rate_warning_threshold,
+                rate_critical_threshold=line.rate_critical_threshold,
+                effective_rate_warning=eff_warning,
+                effective_rate_critical=eff_critical,
             )
         )
     return result
@@ -235,15 +309,7 @@ def get_line(
     line = db.get(Line, line_id)
     if not line:
         raise HTTPException(status_code=404, detail="Line not found")
-    return LineDetailDTO(
-        id=line.id,
-        name=line.name,
-        daily_target=line.daily_target,
-        video_url=line.video_url,
-        line_coords=line.line_coords,
-        line_direction=line.line_direction or "down",
-        is_active=line.is_active,
-    )
+    return line_to_detail_dto(line)
 
 
 @router.put("/{line_id}", response_model=LineDetailDTO)
@@ -269,17 +335,13 @@ def update_line(
         line.line_direction = payload.line_direction
     if "is_active" in fields_set and payload.is_active is not None:
         line.is_active = payload.is_active
+    if "rate_warning_threshold" in fields_set:
+        line.rate_warning_threshold = payload.rate_warning_threshold
+    if "rate_critical_threshold" in fields_set:
+        line.rate_critical_threshold = payload.rate_critical_threshold
     db.commit()
     db.refresh(line)
-    return LineDetailDTO(
-        id=line.id,
-        name=line.name,
-        daily_target=line.daily_target,
-        video_url=line.video_url,
-        line_coords=line.line_coords,
-        line_direction=line.line_direction or "down",
-        is_active=line.is_active,
-    )
+    return line_to_detail_dto(line)
 
 
 @router.delete("/{line_id}", response_model=LineDetailDTO)
@@ -294,12 +356,4 @@ def delete_line(
     line.is_active = False
     db.commit()
     db.refresh(line)
-    return LineDetailDTO(
-        id=line.id,
-        name=line.name,
-        daily_target=line.daily_target,
-        video_url=line.video_url,
-        line_coords=line.line_coords,
-        line_direction=line.line_direction or "down",
-        is_active=line.is_active,
-    )
+    return line_to_detail_dto(line)
