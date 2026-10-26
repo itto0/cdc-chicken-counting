@@ -36,6 +36,13 @@ def validate_coords_format(coords: Optional[str]) -> Optional[str]:
     return ",".join(parts)
 
 
+def validate_threshold_value(v: Optional[float], field_name: str = "threshold") -> Optional[float]:
+    if v is not None:
+        if not math.isfinite(v) or v <= 0:
+            raise ValueError(f"{field_name} must be a finite number greater than 0")
+    return v
+
+
 class LineCreatePayload(BaseModel):
     id: str = Field(..., min_length=2, max_length=50, description="Alphanumeric slug, e.g. 'line-2'")
     name: str = Field(..., min_length=1, max_length=100)
@@ -44,8 +51,8 @@ class LineCreatePayload(BaseModel):
     line_coords: Optional[str] = Field(None, max_length=100)
     line_direction: str = Field("down")
     is_active: bool = True
-    rate_warning_threshold: float | None = None
-    rate_critical_threshold: float | None = None
+    rate_warning_threshold: Optional[float] = Field(None, gt=0)
+    rate_critical_threshold: Optional[float] = Field(None, gt=0)
 
     @field_validator("name")
     @classmethod
@@ -76,13 +83,23 @@ class LineCreatePayload(BaseModel):
             raise ValueError(f"line_direction must be one of {VALID_DIRECTIONS}")
         return v
 
+    @field_validator("rate_warning_threshold")
+    @classmethod
+    def validate_warning_threshold(cls, v: Optional[float]) -> Optional[float]:
+        return validate_threshold_value(v, "rate_warning_threshold")
+
+    @field_validator("rate_critical_threshold")
+    @classmethod
+    def validate_critical_threshold(cls, v: Optional[float]) -> Optional[float]:
+        return validate_threshold_value(v, "rate_critical_threshold")
+
     @model_validator(mode="after")
     def validate_thresholds(self):
         w = self.rate_warning_threshold
         c = self.rate_critical_threshold
-        if w is not None and w <= 0:
+        if w is not None and not (math.isfinite(w) and w > 0):
             raise ValueError("rate_warning_threshold must be greater than 0")
-        if c is not None and c <= 0:
+        if c is not None and not (math.isfinite(c) and c > 0):
             raise ValueError("rate_critical_threshold must be greater than 0")
         if w is not None and c is not None and c >= w:
             raise ValueError("rate_critical_threshold must be strictly less than rate_warning_threshold")
@@ -96,8 +113,8 @@ class LineUpdatePayload(BaseModel):
     line_coords: Optional[str] = Field(None, max_length=100)
     line_direction: Optional[str] = None
     is_active: Optional[bool] = None
-    rate_warning_threshold: float | None = None
-    rate_critical_threshold: float | None = None
+    rate_warning_threshold: Optional[float] = Field(None, gt=0)
+    rate_critical_threshold: Optional[float] = Field(None, gt=0)
 
     @field_validator("name")
     @classmethod
@@ -124,13 +141,23 @@ class LineUpdatePayload(BaseModel):
             raise ValueError(f"line_direction must be one of {VALID_DIRECTIONS}")
         return v
 
+    @field_validator("rate_warning_threshold")
+    @classmethod
+    def validate_warning_threshold(cls, v: Optional[float]) -> Optional[float]:
+        return validate_threshold_value(v, "rate_warning_threshold")
+
+    @field_validator("rate_critical_threshold")
+    @classmethod
+    def validate_critical_threshold(cls, v: Optional[float]) -> Optional[float]:
+        return validate_threshold_value(v, "rate_critical_threshold")
+
     @model_validator(mode="after")
     def validate_thresholds(self):
         w = self.rate_warning_threshold
         c = self.rate_critical_threshold
-        if w is not None and w <= 0:
+        if w is not None and not (math.isfinite(w) and w > 0):
             raise ValueError("rate_warning_threshold must be greater than 0")
-        if c is not None and c <= 0:
+        if c is not None and not (math.isfinite(c) and c > 0):
             raise ValueError("rate_critical_threshold must be greater than 0")
         if w is not None and c is not None and c >= w:
             raise ValueError("rate_critical_threshold must be strictly less than rate_warning_threshold")
@@ -168,7 +195,7 @@ class LineDetailDTO(BaseModel):
     effective_rate_critical: float = DEFAULT_RATE_CRITICAL
 
 
-def line_to_detail_dto(line: Line) -> LineDetailDTO:
+def get_effective_thresholds(line: Line) -> tuple[float, float]:
     eff_warning = (
         line.rate_warning_threshold
         if line.rate_warning_threshold is not None
@@ -179,6 +206,11 @@ def line_to_detail_dto(line: Line) -> LineDetailDTO:
         if line.rate_critical_threshold is not None
         else DEFAULT_RATE_CRITICAL
     )
+    return eff_warning, eff_critical
+
+
+def line_to_detail_dto(line: Line) -> LineDetailDTO:
+    eff_warning, eff_critical = get_effective_thresholds(line)
     return LineDetailDTO(
         id=line.id,
         name=line.name,
@@ -187,6 +219,31 @@ def line_to_detail_dto(line: Line) -> LineDetailDTO:
         line_coords=line.line_coords,
         line_direction=line.line_direction or "down",
         is_active=line.is_active,
+        rate_warning_threshold=line.rate_warning_threshold,
+        rate_critical_threshold=line.rate_critical_threshold,
+        effective_rate_warning=eff_warning,
+        effective_rate_critical=eff_critical,
+    )
+
+
+def line_to_status_dto(
+    line: Line,
+    status: str,
+    last_ping: Optional[str],
+    total_today: int,
+) -> LineStatusDTO:
+    eff_warning, eff_critical = get_effective_thresholds(line)
+    return LineStatusDTO(
+        id=line.id,
+        name=line.name,
+        daily_target=line.daily_target,
+        video_url=line.video_url,
+        line_coords=line.line_coords,
+        line_direction=line.line_direction or "down",
+        is_active=line.is_active,
+        status=status,
+        last_ping=last_ping,
+        total_today=total_today,
         rate_warning_threshold=line.rate_warning_threshold,
         rate_critical_threshold=line.rate_critical_threshold,
         effective_rate_warning=eff_warning,
@@ -268,33 +325,12 @@ def list_lines(
             .where(CountEvent.ts_utc <= today_end_utc)
         ) or 0
 
-        eff_warning = (
-            line.rate_warning_threshold
-            if line.rate_warning_threshold is not None
-            else DEFAULT_RATE_WARNING
-        )
-        eff_critical = (
-            line.rate_critical_threshold
-            if line.rate_critical_threshold is not None
-            else DEFAULT_RATE_CRITICAL
-        )
-
         result.append(
-            LineStatusDTO(
-                id=line.id,
-                name=line.name,
-                daily_target=line.daily_target,
-                video_url=line.video_url,
-                line_coords=line.line_coords,
-                line_direction=line.line_direction or "down",
-                is_active=line.is_active,
+            line_to_status_dto(
+                line=line,
                 status=status_str,
                 last_ping=last_ping_str,
                 total_today=count,
-                rate_warning_threshold=line.rate_warning_threshold,
-                rate_critical_threshold=line.rate_critical_threshold,
-                effective_rate_warning=eff_warning,
-                effective_rate_critical=eff_critical,
             )
         )
     return result
@@ -323,6 +359,27 @@ def update_line(
     if not line:
         raise HTTPException(status_code=404, detail="Line not found")
     fields_set = payload.model_fields_set
+
+    target_warning = (
+        payload.rate_warning_threshold
+        if "rate_warning_threshold" in fields_set
+        else line.rate_warning_threshold
+    )
+    target_critical = (
+        payload.rate_critical_threshold
+        if "rate_critical_threshold" in fields_set
+        else line.rate_critical_threshold
+    )
+    if (
+        target_warning is not None
+        and target_critical is not None
+        and target_critical >= target_warning
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="rate_critical_threshold must be strictly less than rate_warning_threshold",
+        )
+
     if "name" in fields_set and payload.name is not None:
         line.name = payload.name
     if "daily_target" in fields_set and payload.daily_target is not None:

@@ -140,3 +140,140 @@ def test_get_lines_includes_effective_thresholds(client: TestClient):
     assert match["rate_critical_threshold"] == 125.0
     assert match["effective_rate_warning"] == 150.0
     assert match["effective_rate_critical"] == 125.0
+
+
+def test_get_line_detail_asserts_threshold_fields_and_effective_rates(client: TestClient):
+    # Test line with custom overrides
+    create_custom = client.post("/api/v1/lines", json={
+        "id": "line-detail-custom",
+        "name": "Detail Custom",
+        "daily_target": 55000,
+        "rate_warning_threshold": 145.0,
+        "rate_critical_threshold": 115.0,
+    })
+    assert create_custom.status_code == 201
+
+    res_custom = client.get("/api/v1/lines/line-detail-custom")
+    assert res_custom.status_code == 200
+    data_custom = res_custom.json()
+    assert data_custom["id"] == "line-detail-custom"
+    assert data_custom["rate_warning_threshold"] == 145.0
+    assert data_custom["rate_critical_threshold"] == 115.0
+    assert data_custom["effective_rate_warning"] == 145.0
+    assert data_custom["effective_rate_critical"] == 115.0
+
+    # Test line with default thresholds (None overrides)
+    create_default = client.post("/api/v1/lines", json={
+        "id": "line-detail-default",
+        "name": "Detail Default",
+        "daily_target": 55000,
+    })
+    assert create_default.status_code == 201
+
+    res_default = client.get("/api/v1/lines/line-detail-default")
+    assert res_default.status_code == 200
+    data_default = res_default.json()
+    assert data_default["id"] == "line-detail-default"
+    assert data_default["rate_warning_threshold"] is None
+    assert data_default["rate_critical_threshold"] is None
+    assert data_default["effective_rate_warning"] == 130.0
+    assert data_default["effective_rate_critical"] == 110.0
+
+
+def test_update_line_partial_fails_when_critical_ge_existing_warning(client: TestClient):
+    client.post("/api/v1/lines", json={
+        "id": "line-partial-test-1",
+        "name": "Partial Test 1",
+        "daily_target": 50000,
+        "rate_warning_threshold": 130.0,
+        "rate_critical_threshold": 110.0,
+    })
+
+    # Partial update: new critical (135.0) >= existing warning (130.0) -> fails 422
+    update_res = client.put("/api/v1/lines/line-partial-test-1", json={
+        "rate_critical_threshold": 135.0,
+    })
+    assert update_res.status_code == 422
+    assert "rate_critical_threshold must be strictly less than rate_warning_threshold" in update_res.json()["detail"]
+
+
+def test_update_line_partial_fails_when_warning_le_existing_critical(client: TestClient):
+    client.post("/api/v1/lines", json={
+        "id": "line-partial-test-2",
+        "name": "Partial Test 2",
+        "daily_target": 50000,
+        "rate_warning_threshold": 130.0,
+        "rate_critical_threshold": 110.0,
+    })
+
+    # Partial update: new warning (105.0) <= existing critical (110.0) -> fails 422
+    update_res = client.put("/api/v1/lines/line-partial-test-2", json={
+        "rate_warning_threshold": 105.0,
+    })
+    assert update_res.status_code == 422
+    assert "rate_critical_threshold must be strictly less than rate_warning_threshold" in update_res.json()["detail"]
+
+
+def test_threshold_boundary_equal_fails_validation(client: TestClient):
+    # Create with equal warning and critical
+    res_create = client.post("/api/v1/lines", json={
+        "id": "line-boundary-create",
+        "name": "Boundary Create",
+        "daily_target": 50000,
+        "rate_warning_threshold": 120.0,
+        "rate_critical_threshold": 120.0,
+    })
+    assert res_create.status_code == 422
+
+    # Line setup for PUT boundary tests
+    client.post("/api/v1/lines", json={
+        "id": "line-boundary-put",
+        "name": "Boundary Line",
+        "daily_target": 50000,
+        "rate_warning_threshold": 130.0,
+        "rate_critical_threshold": 110.0,
+    })
+
+    # Full PUT with equal values
+    put_both = client.put("/api/v1/lines/line-boundary-put", json={
+        "rate_warning_threshold": 120.0,
+        "rate_critical_threshold": 120.0,
+    })
+    assert put_both.status_code == 422
+
+    # Partial PUT: critical equal to existing line warning (130.0)
+    put_crit_equal = client.put("/api/v1/lines/line-boundary-put", json={
+        "rate_critical_threshold": 130.0,
+    })
+    assert put_crit_equal.status_code == 422
+    assert "rate_critical_threshold must be strictly less than rate_warning_threshold" in put_crit_equal.json()["detail"]
+
+    # Partial PUT: warning equal to existing line critical (110.0)
+    put_warn_equal = client.put("/api/v1/lines/line-boundary-put", json={
+        "rate_warning_threshold": 110.0,
+    })
+    assert put_warn_equal.status_code == 422
+    assert "rate_critical_threshold must be strictly less than rate_warning_threshold" in put_warn_equal.json()["detail"]
+
+
+def test_put_line_rejects_non_positive_and_non_finite_thresholds(client: TestClient):
+    client.post("/api/v1/lines", json={
+        "id": "line-put-val",
+        "name": "Val Line",
+        "daily_target": 50000,
+        "rate_warning_threshold": 140.0,
+        "rate_critical_threshold": 120.0,
+    })
+
+    # Zero values
+    assert client.put("/api/v1/lines/line-put-val", json={"rate_warning_threshold": 0.0}).status_code == 422
+    assert client.put("/api/v1/lines/line-put-val", json={"rate_critical_threshold": 0.0}).status_code == 422
+
+    # Negative values
+    assert client.put("/api/v1/lines/line-put-val", json={"rate_warning_threshold": -15.0}).status_code == 422
+    assert client.put("/api/v1/lines/line-put-val", json={"rate_critical_threshold": -10.0}).status_code == 422
+
+    # Non-finite values via string
+    for non_finite in ["nan", "-nan", "inf", "-inf", "infinity", "-infinity"]:
+        assert client.put("/api/v1/lines/line-put-val", json={"rate_warning_threshold": non_finite}).status_code == 422
+        assert client.put("/api/v1/lines/line-put-val", json={"rate_critical_threshold": non_finite}).status_code == 422
