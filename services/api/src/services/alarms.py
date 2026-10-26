@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 from services.api.src.db.models import Alarm
 from shared.contracts import HealthSampleDTO
 
+DEFAULT_RATE_WARNING = 130.0
+DEFAULT_RATE_CRITICAL = 110.0
+
 
 class AlarmEvaluator:
     """Evaluates metrics and health samples against operational thresholds
@@ -60,18 +63,39 @@ class AlarmEvaluator:
         self.db.refresh(alarm)
         return alarm
 
-    def evaluate_rate(self, line_id: str, rate_per_min: float) -> Alarm | None:
+    def evaluate_rate(
+        self,
+        line_id: str,
+        rate_per_min: float,
+        warning_threshold: float | None = None,
+        critical_threshold: float | None = None,
+    ) -> Alarm | None:
         """Evaluate line production rate against warning/critical thresholds.
 
-        - rate_per_min < 110.0: CRITICAL (LOW_RATE)
-        - 110.0 <= rate_per_min < 130.0: WARNING (LOW_RATE)
-        - rate_per_min >= 130.0: None (Normal)
+        Uses line-specific overrides when provided, falling back to system defaults
+        (DEFAULT_RATE_WARNING = 130.0, DEFAULT_RATE_CRITICAL = 110.0).
+
+        When rate returns to normal (>= warning threshold), any OPEN LOW_RATE alarm
+        for this line is auto-resolved.
         """
-        if rate_per_min < 110.0:
+        warning = warning_threshold if warning_threshold is not None else DEFAULT_RATE_WARNING
+        critical = critical_threshold if critical_threshold is not None else DEFAULT_RATE_CRITICAL
+
+        if rate_per_min < critical:
             severity = "CRITICAL"
-        elif rate_per_min < 130.0:
+        elif rate_per_min < warning:
             severity = "WARNING"
         else:
+            # Auto-resolve existing open LOW_RATE alarm for this line if present
+            open_alarm = (
+                self.db.query(Alarm)
+                .filter_by(line_id=line_id, alarm_type="LOW_RATE", status="OPEN")
+                .first()
+            )
+            if open_alarm is not None:
+                open_alarm.status = "RESOLVED"
+                open_alarm.resolved_at = datetime.now(timezone.utc)
+                self.db.commit()
             return None
 
         message = f"Production rate fell to {rate_per_min:.1f} birds/min"

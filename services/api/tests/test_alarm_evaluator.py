@@ -289,3 +289,88 @@ def test_evaluate_health_prevents_duplicate_open_alarm(db_session: Session):
     assert alarm1.id == alarm2.id
 
     assert db_session.query(Alarm).filter_by(line_id="lineA").count() == 1
+
+
+def test_alarm_evaluator_uses_custom_line_thresholds(db_session: Session):
+    evaluator = AlarmEvaluator(db=db_session)
+    # Line custom threshold: warning 140, critical 120
+    # A rate of 125 is below warning 140 -> should trigger WARNING
+    alarm = evaluator.evaluate_rate(
+        line_id="customLine",
+        rate_per_min=125.0,
+        warning_threshold=140.0,
+        critical_threshold=120.0,
+    )
+    assert alarm is not None
+    assert alarm.severity == "WARNING"
+
+    # A rate of 115 is below critical 120 -> should trigger CRITICAL
+    alarm_crit = evaluator.evaluate_rate(
+        line_id="customLine2",
+        rate_per_min=115.0,
+        warning_threshold=140.0,
+        critical_threshold=120.0,
+    )
+    assert alarm_crit is not None
+    assert alarm_crit.severity == "CRITICAL"
+
+
+def test_alarm_evaluator_auto_resolves_low_rate_on_recovery(db_session: Session):
+    evaluator = AlarmEvaluator(db=db_session)
+
+    # 1. Trigger WARNING alarm at 120.0 (default warning 130)
+    alarm = evaluator.evaluate_rate(line_id="lineRecover", rate_per_min=120.0)
+    assert alarm is not None
+    assert alarm.status == "OPEN"
+
+    # 2. Rate recovers to 135.0 (>= 130.0)
+    recovered_alarm = evaluator.evaluate_rate(line_id="lineRecover", rate_per_min=135.0)
+    assert recovered_alarm is None
+
+    # Verify existing DB alarm is now RESOLVED
+    saved = db_session.query(Alarm).filter_by(line_id="lineRecover", alarm_type="LOW_RATE").first()
+    assert saved is not None
+    assert saved.status == "RESOLVED"
+    assert saved.resolved_at is not None
+
+
+def test_alarm_evaluator_auto_resolves_low_rate_with_custom_threshold(db_session: Session):
+    evaluator = AlarmEvaluator(db=db_session)
+    # Custom: warning 140, critical 120
+    # 1. Rate 115 is CRITICAL
+    alarm = evaluator.evaluate_rate(
+        line_id="customRec",
+        rate_per_min=115.0,
+        warning_threshold=140.0,
+        critical_threshold=120.0,
+    )
+    assert alarm is not None
+    assert alarm.severity == "CRITICAL"
+    assert alarm.status == "OPEN"
+
+    # 2. Rate recovers to 130.0 (still < 140.0 warning) -> updates to WARNING, still OPEN
+    alarm_mid = evaluator.evaluate_rate(
+        line_id="customRec",
+        rate_per_min=130.0,
+        warning_threshold=140.0,
+        critical_threshold=120.0,
+    )
+    assert alarm_mid is not None
+    assert alarm_mid.severity == "WARNING"
+    assert alarm_mid.status == "OPEN"
+
+    # 3. Rate recovers to 142.0 (>= 140.0) -> RESOLVED
+    recovered = evaluator.evaluate_rate(
+        line_id="customRec",
+        rate_per_min=142.0,
+        warning_threshold=140.0,
+        critical_threshold=120.0,
+    )
+    assert recovered is None
+
+    saved = db_session.query(Alarm).filter_by(line_id="customRec", alarm_type="LOW_RATE").first()
+    assert saved is not None
+    assert saved.status == "RESOLVED"
+    assert saved.resolved_at is not None
+
+

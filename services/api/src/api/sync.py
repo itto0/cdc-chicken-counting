@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from services.api.src.api.live import broadcast_line_update
-from services.api.src.db.models import CountAggregate, CountEvent, HealthSample
+from services.api.src.db.models import CountAggregate, CountEvent, HealthSample, Line
 from services.api.src.db.session import get_db
 from services.api.src.services.alarms import AlarmEvaluator
 from services.api.src.services.preview import is_stream_requested
@@ -97,8 +97,17 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
         if total_today == 0 and payload.aggregates:
             total_today = sum(a.count for a in payload.aggregates)
 
+        line = db.get(Line, payload.line_id)
+        w_thresh = line.rate_warning_threshold if line else None
+        c_thresh = line.rate_critical_threshold if line else None
+
         for agg in payload.aggregates:
-            alarm = evaluator.evaluate_rate(payload.line_id, agg.rate_per_min)
+            alarm = evaluator.evaluate_rate(
+                payload.line_id,
+                agg.rate_per_min,
+                warning_threshold=w_thresh,
+                critical_threshold=c_thresh,
+            )
             if alarm is not None:
                 broadcast_line_update(
                     payload.line_id,

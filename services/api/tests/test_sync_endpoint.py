@@ -401,3 +401,74 @@ def test_sync_health_broadcasts_accuracy_pct(client, monkeypatch):
     assert health_events[0]["accuracy_pct"] == 99.25
 
 
+def test_sync_batch_uses_line_threshold_overrides_and_resolves_alarm(setup_test_db):
+    from services.api.src.db.models import Line, Alarm
+
+    # Create a line with custom thresholds: warning 150.0, critical 120.0
+    with setup_test_db() as db:
+        line = Line(
+            id="lineCustomThresh",
+            name="Line Custom Thresh",
+            rate_warning_threshold=150.0,
+            rate_critical_threshold=120.0,
+        )
+        db.add(line)
+        db.commit()
+
+    client = TestClient(app)
+    start = datetime(2026, 10, 15, 9, 0, 0, tzinfo=timezone.utc).isoformat()
+    end = datetime(2026, 10, 15, 9, 1, 0, tzinfo=timezone.utc).isoformat()
+
+    # 1. Ingest rate of 140.0. Under default (130/110), 140 is normal. But for this line, warning is 150!
+    # So rate 140.0 should trigger WARNING alarm.
+    payload1 = {
+        "line_id": "lineCustomThresh",
+        "events": [],
+        "aggregates": [
+            {
+                "window_start": start,
+                "window_end": end,
+                "count": 140,
+                "rate_per_min": 140.0,
+                "confidence_avg": 0.95,
+                "status": "NORMAL",
+            }
+        ],
+    }
+    resp1 = client.post("/api/v1/sync/batch", json=payload1)
+    assert resp1.status_code == 200
+
+    with setup_test_db() as db:
+        alarm = db.scalars(select(Alarm).where(Alarm.line_id == "lineCustomThresh")).first()
+        assert alarm is not None
+        assert alarm.severity == "WARNING"
+        assert alarm.status == "OPEN"
+
+    # 2. Ingest rate of 155.0 (>= 150.0) -> Auto-resolves the alarm
+    start2 = datetime(2026, 10, 15, 9, 1, 0, tzinfo=timezone.utc).isoformat()
+    end2 = datetime(2026, 10, 15, 9, 2, 0, tzinfo=timezone.utc).isoformat()
+    payload2 = {
+        "line_id": "lineCustomThresh",
+        "events": [],
+        "aggregates": [
+            {
+                "window_start": start2,
+                "window_end": end2,
+                "count": 155,
+                "rate_per_min": 155.0,
+                "confidence_avg": 0.95,
+                "status": "NORMAL",
+            }
+        ],
+    }
+    resp2 = client.post("/api/v1/sync/batch", json=payload2)
+    assert resp2.status_code == 200
+
+    with setup_test_db() as db:
+        alarm = db.scalars(select(Alarm).where(Alarm.line_id == "lineCustomThresh")).first()
+        assert alarm is not None
+        assert alarm.status == "RESOLVED"
+        assert alarm.resolved_at is not None
+
+
+
