@@ -145,7 +145,7 @@ export function useLiveStream(lineId: string): LiveStreamState {
         } else if (typeof data.live_speed === "number") {
           setLiveSpeed(data.live_speed);
         }
-        if (typeof data.total_today === "number") {
+        if (typeof data.total_today === "number" && !isNaN(data.total_today) && data.total_today >= 0) {
           setTotalToday(data.total_today);
         } else {
           setTotalToday((prev) => prev + 1);

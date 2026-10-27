@@ -93,19 +93,25 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
         rate_per_min = float(latest_agg.rate_per_min) if latest_agg else 0.0
         status = latest_agg.status if latest_agg else "NORMAL"
 
-        for ev in newly_ingested:
-            broadcast_line_update(
-                payload.line_id,
-                "count",
-                {
-                    "event_id": ev.id,
-                    "track_id": ev.track_id,
-                    "ts_utc": ev.ts_utc.isoformat() if hasattr(ev.ts_utc, "isoformat") else str(ev.ts_utc),
-                    "total_today": int(total_today),
-                    "rate_per_min": rate_per_min,
-                    "status": status,
-                },
-            )
+        last_event = newly_ingested[-1]
+        ts_utc_iso = last_event.ts_utc.isoformat() if hasattr(last_event.ts_utc, "isoformat") else str(last_event.ts_utc)
+        if ts_utc_iso.endswith("+00:00"):
+            ts_utc_iso = ts_utc_iso[:-6] + "Z"
+        elif not ts_utc_iso.endswith("Z"):
+            ts_utc_iso = f"{ts_utc_iso}Z"
+
+        broadcast_line_update(
+            payload.line_id,
+            "count",
+            {
+                "event_id": last_event.id,
+                "track_id": last_event.track_id,
+                "ts_utc": ts_utc_iso,
+                "total_today": int(total_today),
+                "rate_per_min": rate_per_min,
+                "status": status,
+            },
+        )
 
     # Wire Alarm Evaluator and SSE Broadcaster for aggregates
     if payload.aggregates:

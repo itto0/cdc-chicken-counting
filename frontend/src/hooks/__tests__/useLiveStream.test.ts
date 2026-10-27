@@ -125,4 +125,28 @@ describe("useLiveStream hook", () => {
     expect(result.current.countTick).toBe(2);
     expect(result.current.totalToday).toBe(6);
   });
+
+  it("falls back to incrementing totalToday when count event has invalid total_today (negative or NaN)", async () => {
+    const { result } = renderHook(() => useLiveStream("line-1"));
+
+    await vi.waitFor(() => expect(result.current.status).toBe("CONNECTED"));
+    const instance = MockEventSource.instances[0];
+
+    act(() => {
+      instance.emit("count", { total_today: 10 });
+    });
+    expect(result.current.totalToday).toBe(10);
+
+    // Negative total_today should fall back to prev + 1
+    act(() => {
+      instance.emit("count", { total_today: -5 });
+    });
+    expect(result.current.totalToday).toBe(11);
+
+    // NaN total_today should fall back to prev + 1
+    act(() => {
+      instance.emit("count", { total_today: NaN });
+    });
+    expect(result.current.totalToday).toBe(12);
+  });
 });

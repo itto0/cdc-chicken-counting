@@ -25,7 +25,7 @@ class LoginRequest(BaseModel):
 
 
 class UserDTO(BaseModel):
-    id: int
+    id: int | str
     username: str
     role: str
     is_active: bool

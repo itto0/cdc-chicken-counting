@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from services.api.src.main import app
 from services.api.src.db.session import get_db
 from services.api.src.db.models import Base, Line, CountEvent, CountAggregate
+from services.api.src.api.auth import get_current_user, UserDTO
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -71,7 +72,16 @@ def counts_client():
     app.dependency_overrides[get_db] = override_get_db
     client = TestClient(app)
     yield client
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture(autouse=True)
+def override_counts_auth():
+    app.dependency_overrides[get_current_user] = lambda: UserDTO(
+        id="test_user", username="tester", role="operator", is_active=True
+    )
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
 
 def test_get_line_counts(counts_client):
     response = counts_client.get("/api/v1/lines/line-1/counts?page=1&limit=10")
@@ -383,6 +393,29 @@ def test_create_single_count_event_broadcasts_and_updates_total(client, test_db)
     assert event_data["total_today"] == 1
     assert event_data["rate_per_min"] == 0.0
     assert event_data["status"] == "NORMAL"
+    assert event_data["ts_utc"].endswith("Z")
+
+
+def test_create_single_count_event_unauthenticated_returns_401(client, test_db):
+    from services.api.src.db.models import Line
+
+    line = Line(id="line_single_test_auth", name="Line Auth Test", is_active=True)
+    test_db.add(line)
+    test_db.commit()
+
+    app.dependency_overrides.pop(get_current_user, None)
+    try:
+        payload = {
+            "track_id": 501,
+            "confidence": 0.98,
+            "ts_utc": datetime.now(timezone.utc).isoformat(),
+        }
+        resp = client.post("/api/v1/lines/line_single_test_auth/events", json=payload)
+        assert resp.status_code == 401
+    finally:
+        app.dependency_overrides[get_current_user] = lambda: UserDTO(
+            id="test_user", username="tester", role="operator", is_active=True
+        )
 
 
 def test_create_single_count_event_duplicate_skips_broadcast(client, test_db):
@@ -411,29 +444,63 @@ def test_create_single_count_event_duplicate_skips_broadcast(client, test_db):
 
 
 def test_create_single_count_event_nonexistent_line_returns_404(client, test_db):
-    payload = {"track_id": 999, "confidence": 0.98}
+    payload = {
+        "track_id": 999,
+        "confidence": 0.98,
+        "ts_utc": datetime.now(timezone.utc).isoformat(),
+    }
     resp = client.post("/api/v1/lines/non_existent_line/events", json=payload)
     assert resp.status_code == 404
 
 
-def test_create_single_count_event_without_ts_utc_defaults_to_now(client, test_db):
-    from services.api.src.api.live import broadcaster
+def test_create_single_count_event_missing_ts_utc_returns_422(client, test_db):
     from services.api.src.db.models import Line
 
     line = Line(id="line_single_test_no_ts", name="Line No TS", is_active=True)
     test_db.add(line)
     test_db.commit()
 
-    broadcaster.clear()
     payload = {"track_id": 601, "confidence": 0.95}
 
     resp = client.post("/api/v1/lines/line_single_test_no_ts/events", json=payload)
-    assert resp.status_code == 201
-    data = resp.json()
-    assert data["success"] is True
-    assert data["ingested"] is True
-    assert data["total_today"] == 1
-    assert data["line_id"] == "line_single_test_no_ts"
+    assert resp.status_code == 422
+
+
+def test_create_single_count_event_field_validations_return_422(client, test_db):
+    from services.api.src.db.models import Line
+
+    line = Line(id="line_single_test_val", name="Line Validation Test", is_active=True)
+    test_db.add(line)
+    test_db.commit()
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # track_id < 1
+    resp1 = client.post(
+        "/api/v1/lines/line_single_test_val/events",
+        json={"track_id": 0, "confidence": 0.95, "ts_utc": now_iso},
+    )
+    assert resp1.status_code == 422
+
+    resp2 = client.post(
+        "/api/v1/lines/line_single_test_val/events",
+        json={"track_id": -5, "confidence": 0.95, "ts_utc": now_iso},
+    )
+    assert resp2.status_code == 422
+
+    # confidence < 0.0
+    resp3 = client.post(
+        "/api/v1/lines/line_single_test_val/events",
+        json={"track_id": 1, "confidence": -0.1, "ts_utc": now_iso},
+    )
+    assert resp3.status_code == 422
+
+    # confidence > 1.0
+    resp4 = client.post(
+        "/api/v1/lines/line_single_test_val/events",
+        json={"track_id": 1, "confidence": 1.1, "ts_utc": now_iso},
+    )
+    assert resp4.status_code == 422
 
 
 def test_create_single_count_event_invalid_ts_utc_returns_400(client, test_db):

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -42,9 +42,9 @@ class LineCountsResponse(BaseModel):
 
 
 class SingleCountEventRequest(BaseModel):
-    track_id: int
-    confidence: float = 1.0
-    ts_utc: Optional[str] = None
+    track_id: int = Field(ge=1)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    ts_utc: str
 
 
 class SingleCountEventResponse(BaseModel):
@@ -225,15 +225,13 @@ def create_single_count_event(
     payload: SingleCountEventRequest,
     response: Response,
     db: Session = Depends(get_db),
+    current_user: UserDTO = Depends(get_current_user),
 ):
     line = db.get(Line, line_id)
     if not line:
         raise HTTPException(status_code=404, detail="Line not found")
 
-    if payload.ts_utc:
-        dt = _parse_filter_datetime(payload.ts_utc, "ts_utc")
-    else:
-        dt = datetime.now(timezone.utc).replace(tzinfo=None)
+    dt = _parse_filter_datetime(payload.ts_utc, "ts_utc")
 
     event_record = CountEvent(
         line_id=line_id,
@@ -283,7 +281,7 @@ def create_single_count_event(
             {
                 "event_id": event_record.id,
                 "track_id": event_record.track_id,
-                "ts_utc": event_record.ts_utc.isoformat(),
+                "ts_utc": f"{event_record.ts_utc.isoformat()}Z",
                 "total_today": int(total_today),
                 "rate_per_min": rate,
                 "status": status,

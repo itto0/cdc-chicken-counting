@@ -545,4 +545,51 @@ def test_sync_batch_duplicate_events_do_not_broadcast_count(setup_test_db):
     assert queue.empty()
 
 
+def test_sync_batch_broadcasts_single_count_event_for_multi_event_batch(setup_test_db):
+    from datetime import timedelta
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    client = TestClient(app)
+    from services.api.src.api.live import broadcaster
+    broadcaster.clear()
+
+    now = datetime.now(timezone.utc)
+    ts1 = (now - timedelta(seconds=2)).isoformat()
+    ts2 = (now - timedelta(seconds=1)).isoformat()
+    ts3 = now.isoformat()
+
+    payload = {
+        "line_id": "line_batch_multi_event",
+        "events": [
+            {"track_id": 301, "ts_utc": ts1, "confidence": 0.95},
+            {"track_id": 302, "ts_utc": ts2, "confidence": 0.96},
+            {"track_id": 303, "ts_utc": ts3, "confidence": 0.97},
+        ],
+    }
+
+    queue = broadcaster.subscribe("line_batch_multi_event")
+
+    resp = client.post("/api/v1/sync/batch", json=payload)
+    assert resp.status_code == 200
+    assert resp.json()["ingested_events"] == 3
+
+    # Verify exactly 1 count SSE event was broadcast with latest event's track_id and total_today
+    broadcasted = []
+    while not queue.empty():
+        broadcasted.append(queue.get_nowait())
+
+    count_broadcasts = [ev for ev in broadcasted if ev[0] == "count"]
+    assert len(count_broadcasts) == 1
+    assert count_broadcasts[0][1]["track_id"] == 303
+    assert count_broadcasts[0][1]["total_today"] == 3
+    assert count_broadcasts[0][1]["ts_utc"].endswith("Z")
+
+
+
 
