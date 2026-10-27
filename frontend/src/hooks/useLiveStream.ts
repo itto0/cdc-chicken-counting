@@ -129,7 +129,7 @@ export function useLiveStream(lineId: string): LiveStreamState {
         if (data.status) {
           setStreamState(String(data.status));
         }
-        if (typeof data.total_today === "number" && data.total_today > 0) {
+        if (typeof data.total_today === "number" && data.total_today >= 0) {
           setTotalToday(data.total_today);
         }
       }
@@ -147,6 +147,8 @@ export function useLiveStream(lineId: string): LiveStreamState {
         }
         if (typeof data.total_today === "number") {
           setTotalToday(data.total_today);
+        } else {
+          setTotalToday((prev) => prev + 1);
         }
         const timeVal = data.ts_utc || data.timestamp || new Date().toISOString();
         setLastCountTime(timeVal);
