@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 from datetime import datetime, timezone, timedelta
 from fastapi.testclient import TestClient
@@ -302,4 +303,187 @@ def test_get_line_counts_hourly_fallback_to_aggregates(counts_client):
 def test_get_line_counts_invalid_period(counts_client):
     response = counts_client.get("/api/v1/lines/line-1/counts?period=invalid")
     assert response.status_code == 422
+
+
+@pytest.fixture
+def test_db_session(tmp_path):
+    test_db_file = tmp_path / "test_single_counts.db"
+    test_engine = create_engine(
+        f"sqlite:///{test_db_file}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(bind=test_engine)
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+    def override_get_db():
+        db = TestingSessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    yield TestingSessionLocal
+    app.dependency_overrides.pop(get_db, None)
+    test_engine.dispose()
+
+
+@pytest.fixture
+def client(test_db_session):
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return TestClient(app)
+
+
+@pytest.fixture
+def test_db(test_db_session):
+    db = test_db_session()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def test_create_single_count_event_broadcasts_and_updates_total(client, test_db):
+    from services.api.src.api.live import broadcaster
+    from services.api.src.db.models import Line
+
+    # Ensure line exists
+    line = Line(id="line_single_test", name="Line Single Test", is_active=True)
+    test_db.add(line)
+    test_db.commit()
+
+    broadcaster.clear()
+    queue = broadcaster.subscribe("line_single_test")
+
+    payload = {
+        "track_id": 501,
+        "confidence": 0.98,
+        "ts_utc": datetime.now(timezone.utc).isoformat(),
+    }
+
+    resp = client.post("/api/v1/lines/line_single_test/events", json=payload)
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["success"] is True
+    assert data["ingested"] is True
+    assert data["total_today"] == 1
+
+    # Verify SSE broadcast
+    assert not queue.empty()
+    event_type, event_data = queue.get_nowait()
+    assert event_type == "count"
+    assert event_data["track_id"] == 501
+    assert event_data["total_today"] == 1
+    assert event_data["rate_per_min"] == 0.0
+    assert event_data["status"] == "NORMAL"
+
+
+def test_create_single_count_event_duplicate_skips_broadcast(client, test_db):
+    from services.api.src.api.live import broadcaster
+    from services.api.src.db.models import Line
+
+    line = Line(id="line_single_test", name="Line Single Test", is_active=True)
+    test_db.add(line)
+    test_db.commit()
+
+    broadcaster.clear()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    payload = {"track_id": 502, "confidence": 0.98, "ts_utc": now_iso}
+
+    resp1 = client.post("/api/v1/lines/line_single_test/events", json=payload)
+    assert resp1.status_code == 201
+    assert resp1.json()["ingested"] is True
+
+    queue = broadcaster.subscribe("line_single_test")
+
+    # Resend identical
+    resp2 = client.post("/api/v1/lines/line_single_test/events", json=payload)
+    assert resp2.status_code == 200
+    assert resp2.json()["ingested"] is False
+    assert queue.empty()
+
+
+def test_create_single_count_event_nonexistent_line_returns_404(client, test_db):
+    payload = {"track_id": 999, "confidence": 0.98}
+    resp = client.post("/api/v1/lines/non_existent_line/events", json=payload)
+    assert resp.status_code == 404
+
+
+def test_create_single_count_event_without_ts_utc_defaults_to_now(client, test_db):
+    from services.api.src.api.live import broadcaster
+    from services.api.src.db.models import Line
+
+    line = Line(id="line_single_test_no_ts", name="Line No TS", is_active=True)
+    test_db.add(line)
+    test_db.commit()
+
+    broadcaster.clear()
+    payload = {"track_id": 601, "confidence": 0.95}
+
+    resp = client.post("/api/v1/lines/line_single_test_no_ts/events", json=payload)
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["success"] is True
+    assert data["ingested"] is True
+    assert data["total_today"] == 1
+    assert data["line_id"] == "line_single_test_no_ts"
+
+
+def test_create_single_count_event_invalid_ts_utc_returns_400(client, test_db):
+    from services.api.src.db.models import Line
+
+    line = Line(id="line_single_test_bad_ts", name="Line Bad TS", is_active=True)
+    test_db.add(line)
+    test_db.commit()
+
+    payload = {"track_id": 701, "confidence": 0.95, "ts_utc": "not-a-valid-datetime"}
+    resp = client.post("/api/v1/lines/line_single_test_bad_ts/events", json=payload)
+    assert resp.status_code == 400
+    assert "Invalid datetime format for ts_utc" in resp.json()["detail"]
+
+
+def test_create_single_count_event_with_existing_aggregate_rates(client, test_db):
+    from services.api.src.api.live import broadcaster
+    from services.api.src.db.models import Line, CountAggregate
+
+    line = Line(id="line_with_agg", name="Line With Agg", is_active=True)
+    test_db.add(line)
+    now = datetime.now(timezone.utc)
+    agg = CountAggregate(
+        line_id="line_with_agg",
+        window_start=now - timedelta(minutes=5),
+        window_end=now,
+        count=50,
+        rate_per_min=10.0,
+        confidence_avg=0.99,
+        status="WARNING",
+    )
+    test_db.add(agg)
+    test_db.commit()
+
+    broadcaster.clear()
+    queue = broadcaster.subscribe("line_with_agg")
+
+    payload = {
+        "track_id": 801,
+        "confidence": 0.99,
+        "ts_utc": now.isoformat(),
+    }
+
+    resp = client.post("/api/v1/lines/line_with_agg/events", json=payload)
+    assert resp.status_code == 201
+
+    assert not queue.empty()
+    event_type, event_data = queue.get_nowait()
+    assert event_type == "count"
+    assert event_data["rate_per_min"] == 10.0
+    assert event_data["status"] == "WARNING"
+
 

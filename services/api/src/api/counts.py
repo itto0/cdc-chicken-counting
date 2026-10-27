@@ -1,12 +1,14 @@
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from services.api.src.db.models import Line, CountEvent, CountAggregate
 from services.api.src.db.session import get_db
 from services.api.src.api.auth import get_current_user, UserDTO
+from services.api.src.api.live import broadcast_line_update
 from shared.time_utils import to_jakarta, get_jakarta_today_bounds_utc
 
 router = APIRouter(prefix="/api/v1/lines", tags=["counts"])
@@ -37,6 +39,19 @@ class LineCountsResponse(BaseModel):
     aggregates: List[AggregateItemDTO]
     events: List[CountEventDTO]
     pagination: PaginationMeta
+
+
+class SingleCountEventRequest(BaseModel):
+    track_id: int
+    confidence: float = 1.0
+    ts_utc: Optional[str] = None
+
+
+class SingleCountEventResponse(BaseModel):
+    success: bool
+    ingested: bool
+    total_today: int
+    line_id: str
 
 
 def _parse_filter_datetime(dt_str: str, param: str) -> datetime:
@@ -202,4 +217,84 @@ def get_line_counts(
         events=events_dto,
         pagination=PaginationMeta(total=total_events, page=page, limit=limit),
     )
+
+
+@router.post("/{line_id}/events", response_model=SingleCountEventResponse)
+def create_single_count_event(
+    line_id: str,
+    payload: SingleCountEventRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    line = db.get(Line, line_id)
+    if not line:
+        raise HTTPException(status_code=404, detail="Line not found")
+
+    if payload.ts_utc:
+        dt = _parse_filter_datetime(payload.ts_utc, "ts_utc")
+    else:
+        dt = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    event_record = CountEvent(
+        line_id=line_id,
+        track_id=payload.track_id,
+        ts_utc=dt,
+        confidence=payload.confidence,
+    )
+
+    ingested = False
+    try:
+        with db.begin_nested():
+            db.add(event_record)
+            db.flush()
+        ingested = True
+        response.status_code = 201
+    except IntegrityError:
+        response.status_code = 200
+
+    db.commit()
+
+    # Query total today
+    today_start_utc, today_end_utc = get_jakarta_today_bounds_utc()
+    total_today = (
+        db.query(func.count(CountEvent.id))
+        .filter(
+            CountEvent.line_id == line_id,
+            CountEvent.ts_utc >= today_start_utc.replace(tzinfo=None),
+            CountEvent.ts_utc <= today_end_utc.replace(tzinfo=None),
+        )
+        .scalar()
+        or 0
+    )
+
+    if ingested:
+        latest_agg = (
+            db.query(CountAggregate)
+            .filter(CountAggregate.line_id == line_id)
+            .order_by(CountAggregate.window_end.desc())
+            .first()
+        )
+        rate = float(latest_agg.rate_per_min) if latest_agg else 0.0
+        status = latest_agg.status if latest_agg else "NORMAL"
+
+        broadcast_line_update(
+            line_id,
+            "count",
+            {
+                "event_id": event_record.id,
+                "track_id": event_record.track_id,
+                "ts_utc": event_record.ts_utc.isoformat(),
+                "total_today": int(total_today),
+                "rate_per_min": rate,
+                "status": status,
+            },
+        )
+
+    return SingleCountEventResponse(
+        success=True,
+        ingested=ingested,
+        total_today=int(total_today),
+        line_id=line_id,
+    )
+
 
