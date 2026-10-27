@@ -21,6 +21,7 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
     duplicates_skipped = 0
     ingested_aggregates = 0
     health_ingested = False
+    newly_ingested: list[CountEvent] = []
 
     for ev in payload.events:
         event_record = CountEvent(
@@ -34,6 +35,7 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
                 db.add(event_record)
                 db.flush()
             ingested_events += 1
+            newly_ingested.append(event_record)
         except IntegrityError:
             duplicates_skipped += 1
 
@@ -68,6 +70,42 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
     db.commit()
 
     evaluator = AlarmEvaluator(db)
+
+    # Wire SSE Broadcaster for newly ingested count events
+    if newly_ingested:
+        today_start_utc, today_end_utc = get_jakarta_today_bounds_utc()
+        total_today = (
+            db.query(func.count(CountEvent.id))
+            .filter(
+                CountEvent.line_id == payload.line_id,
+                CountEvent.ts_utc >= today_start_utc.replace(tzinfo=None),
+                CountEvent.ts_utc <= today_end_utc.replace(tzinfo=None),
+            )
+            .scalar()
+            or 0
+        )
+        latest_agg = (
+            db.query(CountAggregate)
+            .filter(CountAggregate.line_id == payload.line_id)
+            .order_by(CountAggregate.window_end.desc())
+            .first()
+        )
+        rate_per_min = float(latest_agg.rate_per_min) if latest_agg else 0.0
+        status = latest_agg.status if latest_agg else "NORMAL"
+
+        for ev in newly_ingested:
+            broadcast_line_update(
+                payload.line_id,
+                "count",
+                {
+                    "event_id": ev.id,
+                    "track_id": ev.track_id,
+                    "ts_utc": ev.ts_utc.isoformat() if hasattr(ev.ts_utc, "isoformat") else str(ev.ts_utc),
+                    "total_today": int(total_today),
+                    "rate_per_min": rate_per_min,
+                    "status": status,
+                },
+            )
 
     # Wire Alarm Evaluator and SSE Broadcaster for aggregates
     if payload.aggregates:

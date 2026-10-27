@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
@@ -469,6 +470,79 @@ def test_sync_batch_uses_line_threshold_overrides_and_resolves_alarm(setup_test_
         assert alarm is not None
         assert alarm.status == "RESOLVED"
         assert alarm.resolved_at is not None
+
+
+def test_sync_batch_broadcasts_count_event_on_ingested_events(setup_test_db):
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    client = TestClient(app)
+    from services.api.src.api.live import broadcaster
+    broadcaster.clear()
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    payload = {
+        "line_id": "line_stream_test",
+        "events": [
+            {"track_id": 201, "ts_utc": now_iso, "confidence": 0.96}
+        ]
+    }
+
+    # Subscribe to line_stream_test queue
+    queue = broadcaster.subscribe("line_stream_test")
+
+    resp = client.post("/api/v1/sync/batch", json=payload)
+    assert resp.status_code == 200
+    assert resp.json()["ingested_events"] == 1
+
+    # Verify count SSE event was broadcast
+    assert not queue.empty()
+    event_type, event_data = queue.get_nowait()
+    assert event_type == "count"
+    assert event_data["total_today"] == 1
+    assert event_data["track_id"] == 201
+
+
+def test_sync_batch_duplicate_events_do_not_broadcast_count(setup_test_db):
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    client = TestClient(app)
+    from services.api.src.api.live import broadcaster
+    broadcaster.clear()
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    payload = {
+        "line_id": "line_stream_test",
+        "events": [
+            {"track_id": 202, "ts_utc": now_iso, "confidence": 0.96}
+        ]
+    }
+
+    resp1 = client.post("/api/v1/sync/batch", json=payload)
+    assert resp1.status_code == 200
+    assert resp1.json()["ingested_events"] == 1
+
+    queue = broadcaster.subscribe("line_stream_test")
+
+    # Resend identical payload (duplicate)
+    resp2 = client.post("/api/v1/sync/batch", json=payload)
+    assert resp2.status_code == 200
+    assert resp2.json()["ingested_events"] == 0
+    assert resp2.json()["duplicates_skipped"] == 1
+
+    # Queue should NOT receive another count event for duplicate
+    assert queue.empty()
 
 
 
