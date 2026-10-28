@@ -110,6 +110,16 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "users",
+        element: (
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <Suspense fallback={<PageLoader />}>
+              <PenggunaPage />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: "api-keys",
         element: (
           <ProtectedRoute allowedRoles={["admin"]}>

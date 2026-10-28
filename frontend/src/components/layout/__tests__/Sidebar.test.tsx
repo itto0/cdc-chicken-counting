@@ -21,7 +21,7 @@ describe("Sidebar Navigation", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders 'Pengguna' navigation item linking to /pengguna when user has role 'admin'", () => {
+  it("renders 'User Management' navigation item linking to /pengguna when user has role 'admin'", () => {
     mockCurrentUser = { id: 1, username: "admin_user", role: "admin", is_active: true };
 
     render(
@@ -30,16 +30,16 @@ describe("Sidebar Navigation", () => {
       </MemoryRouter>
     );
 
-    const penggunaLink = screen.getByRole("link", { name: "Pengguna" });
-    expect(penggunaLink).toBeDefined();
-    expect(penggunaLink.getAttribute("href")).toBe("/pengguna");
+    const userManagementLink = screen.getByRole("link", { name: "User Management" });
+    expect(userManagementLink).toBeDefined();
+    expect(userManagementLink.getAttribute("href")).toBe("/pengguna");
 
     const pengaturanLink = screen.getByRole("link", { name: "Pengaturan" });
     expect(pengaturanLink).toBeDefined();
     expect(pengaturanLink.getAttribute("href")).toBe("/pengaturan");
   });
 
-  it("does not render 'Pengguna' or 'Pengaturan' navigation item when user has role 'operator'", () => {
+  it("does not render 'User Management' or 'Pengaturan' navigation item when user has role 'operator'", () => {
     mockCurrentUser = { id: 2, username: "operator_jane", role: "operator", is_active: true };
 
     render(
@@ -48,7 +48,7 @@ describe("Sidebar Navigation", () => {
       </MemoryRouter>
     );
 
-    expect(screen.queryByRole("link", { name: "Pengguna" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "User Management" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Pengaturan" })).toBeNull();
 
     // Standard operator items are visible
@@ -68,7 +68,7 @@ describe("Sidebar Navigation", () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole("link", { name: "Pengguna" }));
+    fireEvent.click(screen.getByRole("link", { name: "User Management" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
