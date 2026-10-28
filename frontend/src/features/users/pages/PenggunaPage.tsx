@@ -61,7 +61,7 @@ export function PenggunaPage() {
       const data = await usersApi.getUsers();
       setUsers(Array.isArray(data) ? data : []);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Gagal memuat data pengguna";
+      const msg = err instanceof Error ? err.message : "Failed to load user data";
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -119,8 +119,8 @@ export function PenggunaPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Manajemen Pengguna"
-        description="Kelola akun pengguna, peran otorisasi, status aktivasi, dan reset kredensial sistem"
+        title="User Management"
+        description="Manage user accounts, roles, and access permissions in the system."
       >
         <Button
           variant="outline"
@@ -130,7 +130,7 @@ export function PenggunaPage() {
           className="flex items-center gap-1.5 cursor-pointer"
         >
           <RefreshCw className={cn("w-4 h-4", (isLoading || isRefreshing) && "animate-spin")} />
-          <span>Segarkan</span>
+          <span>{isRefreshing ? "Refreshing..." : "Refresh"}</span>
         </Button>
         <Button
           size="sm"
@@ -138,7 +138,7 @@ export function PenggunaPage() {
           className="flex items-center gap-1.5 cursor-pointer"
         >
           <UserPlus className="w-4 h-4" />
-          <span>Tambah Pengguna</span>
+          <span>Add User</span>
         </Button>
       </PageHeader>
 
@@ -147,7 +147,7 @@ export function PenggunaPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Total Pengguna
+              Total Users
             </CardTitle>
             <div className="p-2 bg-slate-100 rounded-lg text-slate-600">
               <Users className="w-4 h-4" />
@@ -155,14 +155,14 @@ export function PenggunaPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-slate-900">{totalCount}</div>
-            <p className="text-xs text-slate-500 mt-1">Terdaftar di sistem</p>
+            <p className="text-xs text-slate-500 mt-1">Registered in system</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Pengguna Aktif
+              Active Users
             </CardTitle>
             <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
               <UserCheck className="w-4 h-4" />
@@ -170,7 +170,7 @@ export function PenggunaPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600">{activeCount}</div>
-            <p className="text-xs text-slate-500 mt-1">Dapat melakukan login</p>
+            <p className="text-xs text-slate-500 mt-1">Can sign in</p>
           </CardContent>
         </Card>
 
@@ -185,7 +185,7 @@ export function PenggunaPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-indigo-600">{adminCount}</div>
-            <p className="text-xs text-slate-500 mt-1">Akses konfigurasi penuh</p>
+            <p className="text-xs text-slate-500 mt-1">Full configuration access</p>
           </CardContent>
         </Card>
 
@@ -200,7 +200,7 @@ export function PenggunaPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-600">{operatorCount}</div>
-            <p className="text-xs text-slate-500 mt-1">Operasional lini dan video</p>
+            <p className="text-xs text-slate-500 mt-1">Line and video operations</p>
           </CardContent>
         </Card>
       </div>
@@ -212,7 +212,7 @@ export function PenggunaPage() {
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-slate-500" />
               <CardTitle className="text-base font-semibold text-slate-900">
-                Daftar Pengguna ({filteredUsers.length})
+                User List ({filteredUsers.length})
               </CardTitle>
             </div>
 
@@ -222,7 +222,7 @@ export function PenggunaPage() {
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <Input
                   type="text"
-                  placeholder="Cari username..."
+                  placeholder="Search username..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 h-9 text-xs"
@@ -234,7 +234,7 @@ export function PenggunaPage() {
                 onChange={(e) => setRoleFilter(e.target.value)}
                 className="h-9 text-xs min-w-[120px]"
               >
-                <option value="all">Semua Peran</option>
+                <option value="all">All Roles</option>
                 <option value="admin">Admin</option>
                 <option value="operator">Operator</option>
               </Select>
@@ -244,9 +244,9 @@ export function PenggunaPage() {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="h-9 text-xs min-w-[120px]"
               >
-                <option value="all">Semua Status</option>
-                <option value="active">Aktif</option>
-                <option value="inactive">Nonaktif</option>
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
               </Select>
             </div>
           </div>
@@ -257,11 +257,11 @@ export function PenggunaPage() {
             <div className="p-4 bg-rose-50 border-b border-rose-100 flex items-center gap-3 text-rose-700 text-sm">
               <AlertCircle className="w-5 h-5 shrink-0" />
               <div className="flex-1">
-                <p className="font-semibold">Gagal memuat pengguna</p>
+                <p className="font-semibold">Failed to load users</p>
                 <p className="text-xs text-rose-600 mt-0.5">{error}</p>
               </div>
               <Button size="sm" variant="outline" onClick={() => fetchUsers(true)}>
-                Coba Lagi
+                Retry
               </Button>
             </div>
           )}
@@ -269,13 +269,13 @@ export function PenggunaPage() {
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-400">
               <RefreshCw className="w-6 h-6 animate-spin text-emerald-600 mb-2" />
-              <p className="text-xs">Memuat daftar pengguna...</p>
+              <p className="text-xs">Loading user list...</p>
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="text-center py-16 text-slate-500">
               <Users className="w-10 h-10 mx-auto text-slate-300 mb-2" />
-              <p className="text-sm font-medium">Tidak ada data pengguna yang cocok</p>
-              <p className="text-xs text-slate-400 mt-1">Coba sesuaikan kata kunci atau filter pencarian</p>
+              <p className="text-sm font-medium">No matching users found</p>
+              <p className="text-xs text-slate-400 mt-1">Try adjusting search keywords or filters</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -283,10 +283,10 @@ export function PenggunaPage() {
                 <thead className="bg-slate-50/75 border-b border-slate-100 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                   <tr>
                     <th className="py-3 px-6">ID</th>
-                    <th className="py-3 px-6">Nama Pengguna</th>
-                    <th className="py-3 px-6">Peran</th>
+                    <th className="py-3 px-6">Username</th>
+                    <th className="py-3 px-6">Role</th>
                     <th className="py-3 px-6">Status</th>
-                    <th className="py-3 px-6 text-right">Aksi</th>
+                    <th className="py-3 px-6 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -302,7 +302,7 @@ export function PenggunaPage() {
                             <span className="font-semibold text-slate-900">{u.username}</span>
                             {isSelf && (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                                Akun Anda
+                                Your Account
                               </span>
                             )}
                           </div>
@@ -324,12 +324,12 @@ export function PenggunaPage() {
                           {u.is_active ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              Aktif
+                              Active
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
                               <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                              Nonaktif
+                              Inactive
                             </span>
                           )}
                         </td>
@@ -338,8 +338,8 @@ export function PenggunaPage() {
                             <button
                               type="button"
                               onClick={() => setEditingUser(u)}
-                              title="Ubah peran dan status"
-                              aria-label="Ubah peran dan status"
+                              title="Edit role and status"
+                              aria-label="Edit role and status"
                               className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
                             >
                               <Edit2 className="w-4 h-4" />
@@ -359,17 +359,17 @@ export function PenggunaPage() {
                               disabled={isSelf || isLastAdmin}
                               title={
                                 isSelf
-                                  ? "Anda tidak dapat menghapus akun sendiri"
+                                  ? "You cannot delete your own account"
                                   : isLastAdmin
-                                  ? "Tidak dapat menghapus satu-satunya admin aktif"
-                                  : "Hapus akun pengguna"
+                                  ? "Cannot delete the only active admin"
+                                  : "Delete user account"
                               }
                               aria-label={
                                 isSelf
-                                  ? "Anda tidak dapat menghapus akun sendiri"
+                                  ? "You cannot delete your own account"
                                   : isLastAdmin
-                                  ? "Tidak dapat menghapus satu-satunya admin aktif"
-                                  : "Hapus akun pengguna"
+                                  ? "Cannot delete the only active admin"
+                                  : "Delete user account"
                               }
                               className={cn(
                                 "p-1.5 rounded-lg transition-colors",

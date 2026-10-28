@@ -67,29 +67,50 @@ describe("PenggunaPage", () => {
 
     render(<PenggunaPage />);
 
-    expect(screen.getByText("Memuat daftar pengguna...")).toBeDefined();
+    expect(screen.getByText("Loading user list...")).toBeDefined();
 
     await waitFor(() => {
       expect(getUsersSpy).toHaveBeenCalledTimes(1);
     });
 
+    // Check Page Header
+    expect(screen.getByRole("heading", { name: "User Management" })).toBeDefined();
+    expect(
+      screen.getByText("Manage user accounts, roles, and access permissions in the system.")
+    ).toBeDefined();
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Add User" })).toBeDefined();
+
     // Check KPI Cards
     await waitFor(() => {
-      expect(screen.getByText("Total Pengguna")).toBeDefined();
+      expect(screen.getByText("Total Users")).toBeDefined();
+      expect(screen.getByText("Registered in system")).toBeDefined();
       expect(screen.getByText("4")).toBeDefined(); // Total
-      expect(screen.getByText("3")).toBeDefined(); // Aktif
+      expect(screen.getByText("Active Users")).toBeDefined();
+      expect(screen.getByText("Can sign in")).toBeDefined();
+      expect(screen.getByText("3")).toBeDefined(); // Active
       expect(screen.getAllByText("2")).toHaveLength(2); // Administrator (2) & Operator (2)
+      expect(screen.getByText("Full configuration access")).toBeDefined();
+      expect(screen.getByText("Line and video operations")).toBeDefined();
     });
 
     // Check table headers and users rendered
-    expect(screen.getByText("Daftar Pengguna (4)")).toBeDefined();
+    expect(screen.getByText("User List (4)")).toBeDefined();
+    expect(screen.getByText("Username")).toBeDefined();
+    expect(screen.getByText("Role")).toBeDefined();
+    expect(screen.getByText("Status")).toBeDefined();
+    expect(screen.getByText("Actions")).toBeDefined();
     expect(screen.getByText("admin_super")).toBeDefined();
     expect(screen.getByText("admin_two")).toBeDefined();
     expect(screen.getByText("operator_one")).toBeDefined();
     expect(screen.getByText("operator_two")).toBeDefined();
 
-    // Check "Akun Anda" badge for current user (id: 1)
-    expect(screen.getByText("Akun Anda")).toBeDefined();
+    // Check "Your Account" badge for current user (id: 1)
+    expect(screen.getByText("Your Account")).toBeDefined();
+
+    // Check Active and Inactive status badges
+    expect(screen.getAllByText("Active").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByText("Inactive").length).toBeGreaterThanOrEqual(1);
   });
 
   it("filters users by search query", async () => {
@@ -100,10 +121,10 @@ describe("PenggunaPage", () => {
       expect(screen.getByText("admin_super")).toBeDefined();
     });
 
-    const searchInput = screen.getByPlaceholderText("Cari username...");
+    const searchInput = screen.getByPlaceholderText("Search username...");
     fireEvent.change(searchInput, { target: { value: "operator" } });
 
-    expect(screen.getByText("Daftar Pengguna (2)")).toBeDefined();
+    expect(screen.getByText("User List (2)")).toBeDefined();
     expect(screen.getByText("operator_one")).toBeDefined();
     expect(screen.getByText("operator_two")).toBeDefined();
     expect(screen.queryByText("admin_super")).toBeNull();
@@ -111,7 +132,8 @@ describe("PenggunaPage", () => {
 
     // Search nonexistent user
     fireEvent.change(searchInput, { target: { value: "nonexistent_user" } });
-    expect(screen.getByText("Tidak ada data pengguna yang cocok")).toBeDefined();
+    expect(screen.getByText("No matching users found")).toBeDefined();
+    expect(screen.getByText("Try adjusting search keywords or filters")).toBeDefined();
   });
 
   it("filters users by role", async () => {
@@ -122,18 +144,18 @@ describe("PenggunaPage", () => {
       expect(screen.getByText("admin_super")).toBeDefined();
     });
 
-    const roleSelect = screen.getByDisplayValue("Semua Peran");
+    const roleSelect = screen.getByDisplayValue("All Roles");
 
     // Filter to admin
     fireEvent.change(roleSelect, { target: { value: "admin" } });
-    expect(screen.getByText("Daftar Pengguna (2)")).toBeDefined();
+    expect(screen.getByText("User List (2)")).toBeDefined();
     expect(screen.getByText("admin_super")).toBeDefined();
     expect(screen.getByText("admin_two")).toBeDefined();
     expect(screen.queryByText("operator_one")).toBeNull();
 
     // Filter to operator
     fireEvent.change(roleSelect, { target: { value: "operator" } });
-    expect(screen.getByText("Daftar Pengguna (2)")).toBeDefined();
+    expect(screen.getByText("User List (2)")).toBeDefined();
     expect(screen.getByText("operator_one")).toBeDefined();
     expect(screen.getByText("operator_two")).toBeDefined();
     expect(screen.queryByText("admin_super")).toBeNull();
@@ -147,11 +169,11 @@ describe("PenggunaPage", () => {
       expect(screen.getByText("admin_super")).toBeDefined();
     });
 
-    const statusSelect = screen.getByDisplayValue("Semua Status");
+    const statusSelect = screen.getByDisplayValue("All Status");
 
     // Filter to active
     fireEvent.change(statusSelect, { target: { value: "active" } });
-    expect(screen.getByText("Daftar Pengguna (3)")).toBeDefined();
+    expect(screen.getByText("User List (3)")).toBeDefined();
     expect(screen.getByText("admin_super")).toBeDefined();
     expect(screen.getByText("admin_two")).toBeDefined();
     expect(screen.getByText("operator_one")).toBeDefined();
@@ -159,7 +181,7 @@ describe("PenggunaPage", () => {
 
     // Filter to inactive
     fireEvent.change(statusSelect, { target: { value: "inactive" } });
-    expect(screen.getByText("Daftar Pengguna (1)")).toBeDefined();
+    expect(screen.getByText("User List (1)")).toBeDefined();
     expect(screen.getByText("operator_two")).toBeDefined();
     expect(screen.queryByText("admin_super")).toBeNull();
   });
@@ -172,9 +194,10 @@ describe("PenggunaPage", () => {
       expect(screen.getByText("admin_super")).toBeDefined();
     });
 
-    const selfDeleteBtn = screen.getByTitle("Anda tidak dapat menghapus akun sendiri");
+    const selfDeleteBtn = screen.getByTitle("You cannot delete your own account");
     expect(selfDeleteBtn).toBeDefined();
     expect(selfDeleteBtn).toHaveProperty("disabled", true);
+    expect(screen.getByLabelText("You cannot delete your own account")).toBe(selfDeleteBtn);
   });
 
   it("disables delete button for last active admin (Invariant 4: Last active admin deletion prevented)", async () => {
@@ -208,9 +231,10 @@ describe("PenggunaPage", () => {
       expect(screen.getByText("sole_admin")).toBeDefined();
     });
 
-    const lastAdminDeleteBtn = screen.getByTitle("Tidak dapat menghapus satu-satunya admin aktif");
+    const lastAdminDeleteBtn = screen.getByTitle("Cannot delete the only active admin");
     expect(lastAdminDeleteBtn).toBeDefined();
     expect(lastAdminDeleteBtn).toHaveProperty("disabled", true);
+    expect(screen.getByLabelText("Cannot delete the only active admin")).toBe(lastAdminDeleteBtn);
   });
 
   it("opens and handles CreateUserModal workflow", async () => {
@@ -229,7 +253,7 @@ describe("PenggunaPage", () => {
     });
 
     // Open modal
-    const addBtn = screen.getByRole("button", { name: "Tambah Pengguna" });
+    const addBtn = screen.getByRole("button", { name: "Add User" });
     fireEvent.click(addBtn);
 
     expect(screen.getByText("Tambah Pengguna Baru")).toBeDefined();
@@ -272,7 +296,7 @@ describe("PenggunaPage", () => {
       expect(screen.getByText("admin_two")).toBeDefined();
     });
 
-    const editButtons = screen.getAllByTitle("Ubah peran dan status");
+    const editButtons = screen.getAllByTitle("Edit role and status");
     // Click edit on admin_two (index 1)
     fireEvent.click(editButtons[1]);
 
@@ -343,7 +367,7 @@ describe("PenggunaPage", () => {
     });
 
     // admin_two is deletable because activeAdminCount=2 and admin_two is not self
-    const deleteButtons = screen.getAllByTitle("Hapus akun pengguna");
+    const deleteButtons = screen.getAllByTitle("Delete user account");
     fireEvent.click(deleteButtons[0]); // First enabled delete button corresponds to admin_two (since admin_super is disabled)
 
     expect(screen.getByRole("heading", { name: "Hapus Pengguna" })).toBeDefined();
@@ -373,14 +397,14 @@ describe("PenggunaPage", () => {
     });
 
     // 1. Open and cancel CreateUserModal
-    fireEvent.click(screen.getByRole("button", { name: "Tambah Pengguna" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add User" }));
     expect(screen.getByText("Tambah Pengguna Baru")).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Batal" }));
     expect(screen.queryByText("Tambah Pengguna Baru")).toBeNull();
     expect(createUserSpy).not.toHaveBeenCalled();
 
     // 2. Open and cancel EditUserModal
-    const editButtons = screen.getAllByTitle("Ubah peran dan status");
+    const editButtons = screen.getAllByTitle("Edit role and status");
     fireEvent.click(editButtons[1]);
     expect(screen.getByText("Ubah Data Pengguna")).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Batal" }));
@@ -396,7 +420,7 @@ describe("PenggunaPage", () => {
     expect(resetPasswordSpy).not.toHaveBeenCalled();
 
     // 4. Open and cancel DeleteUserModal
-    const deleteButtons = screen.getAllByTitle("Hapus akun pengguna");
+    const deleteButtons = screen.getAllByTitle("Delete user account");
     fireEvent.click(deleteButtons[0]);
     expect(screen.getByRole("heading", { name: "Hapus Pengguna" })).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Batal" }));
@@ -414,22 +438,22 @@ describe("PenggunaPage", () => {
 
     // Error state rendered
     await waitFor(() => {
-      expect(screen.getByText("Gagal memuat pengguna")).toBeDefined();
+      expect(screen.getByText("Failed to load users")).toBeDefined();
       expect(screen.getByText("Koneksi terputus")).toBeDefined();
     });
 
-    // Click Coba Lagi
-    const retryBtn = screen.getByRole("button", { name: "Coba Lagi" });
+    // Click Coba Lagi -> Retry
+    const retryBtn = screen.getByRole("button", { name: "Retry" });
     fireEvent.click(retryBtn);
 
     await waitFor(() => {
       expect(getUsersSpy).toHaveBeenCalledTimes(2);
       expect(screen.getByText("admin_super")).toBeDefined();
-      expect(screen.queryByText("Gagal memuat pengguna")).toBeNull();
+      expect(screen.queryByText("Failed to load users")).toBeNull();
     });
 
-    // Test Segarkan button
-    const refreshBtn = screen.getByRole("button", { name: "Segarkan" });
+    // Test Refresh button
+    const refreshBtn = screen.getByRole("button", { name: "Refresh" });
     fireEvent.click(refreshBtn);
 
     await waitFor(() => {
