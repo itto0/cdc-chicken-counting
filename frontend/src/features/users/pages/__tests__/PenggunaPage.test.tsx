@@ -256,18 +256,18 @@ describe("PenggunaPage", () => {
     const addBtn = screen.getByRole("button", { name: "Add User" });
     fireEvent.click(addBtn);
 
-    expect(screen.getByText("Tambah Pengguna Baru")).toBeDefined();
+    expect(screen.getByText("Add New User")).toBeDefined();
 
     // Fill form
-    fireEvent.change(screen.getByPlaceholderText("Contoh: op_johndoe"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g. op_johndoe"), {
       target: { value: "new_operator" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Minimal 6 karakter"), {
+    fireEvent.change(screen.getByPlaceholderText("Minimum 6 characters"), {
       target: { value: "secret123" },
     });
 
     // Submit
-    const submitBtn = screen.getByRole("button", { name: "Simpan Pengguna" });
+    const submitBtn = screen.getByRole("button", { name: "Save User" });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
@@ -279,7 +279,7 @@ describe("PenggunaPage", () => {
       });
       // fetchUsers re-called on success
       expect(getUsersSpy).toHaveBeenCalledTimes(2);
-      expect(screen.queryByText("Tambah Pengguna Baru")).toBeNull();
+      expect(screen.queryByText("Add New User")).toBeNull();
     });
   });
 
@@ -300,11 +300,11 @@ describe("PenggunaPage", () => {
     // Click edit on admin_two (index 1)
     fireEvent.click(editButtons[1]);
 
-    expect(screen.getByText("Ubah Data Pengguna")).toBeDefined();
+    expect(screen.getByText("Edit User")).toBeDefined();
     expect(screen.getAllByText("admin_two").length).toBeGreaterThanOrEqual(1);
 
     // Save changes
-    const submitBtn = screen.getByRole("button", { name: "Simpan Perubahan" });
+    const submitBtn = screen.getByRole("button", { name: "Save Changes" });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
@@ -313,7 +313,7 @@ describe("PenggunaPage", () => {
         is_active: true,
       });
       expect(getUsersSpy).toHaveBeenCalledTimes(2);
-      expect(screen.queryByText("Ubah Data Pengguna")).toBeNull();
+      expect(screen.queryByText("Edit User")).toBeNull();
     });
   });
 
@@ -333,24 +333,24 @@ describe("PenggunaPage", () => {
     // Click reset password on admin_two (index 1)
     fireEvent.click(resetButtons[1]);
 
-    expect(screen.getByText("Reset Password Pengguna")).toBeDefined();
+    expect(screen.getByText("Reset User Password")).toBeDefined();
 
     // Fill new password and confirm
-    fireEvent.change(screen.getByPlaceholderText("Minimal 6 karakter"), {
+    fireEvent.change(screen.getByPlaceholderText("Minimum 6 characters"), {
       target: { value: "newpass123" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Ulangi password baru"), {
+    fireEvent.change(screen.getByPlaceholderText("Re-enter new password"), {
       target: { value: "newpass123" },
     });
 
-    const submitBtn = screen.getByRole("button", { name: "Simpan Password Baru" });
+    const submitBtn = screen.getByRole("button", { name: "Reset Password" });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
       expect(resetPasswordSpy).toHaveBeenCalledWith(2, {
         new_password: "newpass123",
       });
-      expect(screen.queryByText("Reset Password Pengguna")).toBeNull();
+      expect(screen.queryByText("Reset User Password")).toBeNull();
     });
   });
 
@@ -370,16 +370,16 @@ describe("PenggunaPage", () => {
     const deleteButtons = screen.getAllByTitle("Delete user account");
     fireEvent.click(deleteButtons[0]); // First enabled delete button corresponds to admin_two (since admin_super is disabled)
 
-    expect(screen.getByRole("heading", { name: "Hapus Pengguna" })).toBeDefined();
-    expect(screen.getByText(/Apakah Anda yakin ingin menghapus akun/)).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Delete User" })).toBeDefined();
+    expect(screen.getByText(/Are you sure you want to delete user account/)).toBeDefined();
 
-    const confirmBtn = screen.getByRole("button", { name: "Hapus Pengguna" });
+    const confirmBtn = screen.getByRole("button", { name: "Delete User" });
     fireEvent.click(confirmBtn);
 
     await waitFor(() => {
       expect(deleteUserSpy).toHaveBeenCalledWith(2);
       expect(getUsersSpy).toHaveBeenCalledTimes(2);
-      expect(screen.queryByRole("heading", { name: "Hapus Pengguna" })).toBeNull();
+      expect(screen.queryByRole("heading", { name: "Delete User" })).toBeNull();
     });
   });
 
@@ -398,33 +398,33 @@ describe("PenggunaPage", () => {
 
     // 1. Open and cancel CreateUserModal
     fireEvent.click(screen.getByRole("button", { name: "Add User" }));
-    expect(screen.getByText("Tambah Pengguna Baru")).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
-    expect(screen.queryByText("Tambah Pengguna Baru")).toBeNull();
+    expect(screen.getByText("Add New User")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText("Add New User")).toBeNull();
     expect(createUserSpy).not.toHaveBeenCalled();
 
     // 2. Open and cancel EditUserModal
     const editButtons = screen.getAllByTitle("Edit role and status");
     fireEvent.click(editButtons[1]);
-    expect(screen.getByText("Ubah Data Pengguna")).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
-    expect(screen.queryByText("Ubah Data Pengguna")).toBeNull();
+    expect(screen.getByText("Edit User")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText("Edit User")).toBeNull();
     expect(updateUserSpy).not.toHaveBeenCalled();
 
     // 3. Open and cancel ResetPasswordModal
     const resetButtons = screen.getAllByTitle("Reset password");
     fireEvent.click(resetButtons[1]);
-    expect(screen.getByText("Reset Password Pengguna")).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
-    expect(screen.queryByText("Reset Password Pengguna")).toBeNull();
+    expect(screen.getByText("Reset User Password")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText("Reset User Password")).toBeNull();
     expect(resetPasswordSpy).not.toHaveBeenCalled();
 
     // 4. Open and cancel DeleteUserModal
     const deleteButtons = screen.getAllByTitle("Delete user account");
     fireEvent.click(deleteButtons[0]);
-    expect(screen.getByRole("heading", { name: "Hapus Pengguna" })).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
-    expect(screen.queryByRole("heading", { name: "Hapus Pengguna" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Delete User" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("heading", { name: "Delete User" })).toBeNull();
     expect(deleteUserSpy).not.toHaveBeenCalled();
   });
 

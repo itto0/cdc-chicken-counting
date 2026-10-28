@@ -42,11 +42,11 @@ export function ResetPasswordModal({ isOpen, onClose, user, onSubmit }: ResetPas
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (newPassword.length < 6) {
-      setErrorMsg("Password minimal 6 karakter");
+      setErrorMsg("Password must be at least 6 characters");
       return;
     }
     if (newPassword !== confirmPassword) {
-      setErrorMsg("Konfirmasi password baru tidak cocok");
+      setErrorMsg("New passwords do not match");
       return;
     }
 
@@ -56,7 +56,7 @@ export function ResetPasswordModal({ isOpen, onClose, user, onSubmit }: ResetPas
       await onSubmit(user.id, { new_password: newPassword });
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Gagal mengatur ulang password";
+      const msg = err instanceof Error ? err.message : "Failed to reset password";
       setErrorMsg(msg);
     } finally {
       setIsSubmitting(false);
@@ -79,13 +79,13 @@ export function ResetPasswordModal({ isOpen, onClose, user, onSubmit }: ResetPas
             <div className="p-2 bg-amber-50 rounded-lg text-amber-600">
               <KeyRound className="w-5 h-5" />
             </div>
-            <h2 id="reset-password-modal-title" className="text-lg font-semibold text-slate-900">Reset Password Pengguna</h2>
+            <h2 id="reset-password-modal-title" className="text-lg font-semibold text-slate-900">Reset User Password</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            aria-label="Tutup"
+            aria-label="Close"
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-5 h-5" />
@@ -101,19 +101,19 @@ export function ResetPasswordModal({ isOpen, onClose, user, onSubmit }: ResetPas
           )}
 
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-            <span className="text-slate-500 font-medium">Reset password untuk: </span>
+            <span className="text-slate-500 font-medium">Reset password for: </span>
             <span className="font-semibold text-slate-900">{user.username}</span>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Password Baru
+              New Password
             </label>
             <Input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Minimal 6 karakter"
+              placeholder="Minimum 6 characters"
               required
               disabled={isSubmitting}
             />
@@ -121,13 +121,13 @@ export function ResetPasswordModal({ isOpen, onClose, user, onSubmit }: ResetPas
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Konfirmasi Password Baru
+              Confirm New Password
             </label>
             <Input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Ulangi password baru"
+              placeholder="Re-enter new password"
               required
               disabled={isSubmitting}
             />
@@ -135,10 +135,10 @@ export function ResetPasswordModal({ isOpen, onClose, user, onSubmit }: ResetPas
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-              Batal
+              Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Menyimpan..." : "Simpan Password Baru"}
+              {isSubmitting ? "Resetting..." : "Reset Password"}
             </Button>
           </div>
         </form>

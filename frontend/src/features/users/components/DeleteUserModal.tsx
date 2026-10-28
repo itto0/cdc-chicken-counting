@@ -41,7 +41,7 @@ export function DeleteUserModal({ isOpen, onClose, user, onConfirm }: DeleteUser
       await onConfirm(user.id);
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Gagal menghapus pengguna";
+      const msg = err instanceof Error ? err.message : "Failed to delete user";
       setErrorMsg(msg);
     } finally {
       setIsDeleting(false);
@@ -64,13 +64,13 @@ export function DeleteUserModal({ isOpen, onClose, user, onConfirm }: DeleteUser
             <div className="p-2 bg-rose-50 rounded-lg text-rose-600">
               <Trash2 className="w-5 h-5" />
             </div>
-            <h2 id="delete-user-modal-title" className="text-lg font-semibold text-slate-900">Hapus Pengguna</h2>
+            <h2 id="delete-user-modal-title" className="text-lg font-semibold text-slate-900">Delete User</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isDeleting}
-            aria-label="Tutup"
+            aria-label="Close"
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-5 h-5" />
@@ -86,14 +86,14 @@ export function DeleteUserModal({ isOpen, onClose, user, onConfirm }: DeleteUser
           )}
 
           <p className="text-sm text-slate-600 leading-relaxed">
-            Apakah Anda yakin ingin menghapus akun pengguna{" "}
-            <span className="font-semibold text-slate-900">"{user.username}"</span>? Tindakan ini tidak dapat
-            dibatalkan.
+            Are you sure you want to delete user account{" "}
+            <span className="font-semibold text-slate-900">"{user.username}"</span>? This action cannot be
+            undone.
           </p>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <Button type="button" variant="outline" onClick={onClose} disabled={isDeleting}>
-              Batal
+              Cancel
             </Button>
             <Button
               type="button"
@@ -101,7 +101,7 @@ export function DeleteUserModal({ isOpen, onClose, user, onConfirm }: DeleteUser
               onClick={handleDelete}
               disabled={isDeleting}
             >
-              {isDeleting ? "Menghapus..." : "Hapus Pengguna"}
+              {isDeleting ? "Deleting..." : "Delete User"}
             </Button>
           </div>
         </div>

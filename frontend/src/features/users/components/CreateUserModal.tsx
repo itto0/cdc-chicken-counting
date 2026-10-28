@@ -45,15 +45,15 @@ export function CreateUserModal({ isOpen, onClose, onSubmit }: CreateUserModalPr
     e.preventDefault();
     const cleanUsername = username.trim();
     if (!cleanUsername) {
-      setErrorMsg("Nama pengguna tidak boleh kosong");
+      setErrorMsg("Username cannot be empty");
       return;
     }
     if (cleanUsername.length < 3) {
-      setErrorMsg("Nama pengguna minimal 3 karakter");
+      setErrorMsg("Username must be at least 3 characters");
       return;
     }
     if (password.length < 6) {
-      setErrorMsg("Password minimal 6 karakter");
+      setErrorMsg("Password must be at least 6 characters");
       return;
     }
 
@@ -63,7 +63,7 @@ export function CreateUserModal({ isOpen, onClose, onSubmit }: CreateUserModalPr
       await onSubmit({ username: cleanUsername, password, role, is_active: true });
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Gagal menambahkan pengguna";
+      const msg = err instanceof Error ? err.message : "Failed to add user";
       setErrorMsg(msg);
     } finally {
       setIsSubmitting(false);
@@ -86,13 +86,13 @@ export function CreateUserModal({ isOpen, onClose, onSubmit }: CreateUserModalPr
             <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
               <UserPlus className="w-5 h-5" />
             </div>
-            <h2 id="create-user-modal-title" className="text-lg font-semibold text-slate-900">Tambah Pengguna Baru</h2>
+            <h2 id="create-user-modal-title" className="text-lg font-semibold text-slate-900">Add New User</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            aria-label="Tutup"
+            aria-label="Close"
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-5 h-5" />
@@ -109,13 +109,13 @@ export function CreateUserModal({ isOpen, onClose, onSubmit }: CreateUserModalPr
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Nama Pengguna (Username)
+              Username
             </label>
             <Input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Contoh: op_johndoe"
+              placeholder="e.g. op_johndoe"
               required
               disabled={isSubmitting}
             />
@@ -129,7 +129,7 @@ export function CreateUserModal({ isOpen, onClose, onSubmit }: CreateUserModalPr
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Minimal 6 karakter"
+              placeholder="Minimum 6 characters"
               required
               disabled={isSubmitting}
             />
@@ -137,24 +137,24 @@ export function CreateUserModal({ isOpen, onClose, onSubmit }: CreateUserModalPr
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Peran (Role)
+              Role
             </label>
             <Select
               value={role}
               onChange={(e) => setRole(e.target.value as "admin" | "operator")}
               disabled={isSubmitting}
             >
-              <option value="operator">Operator (Pemantauan & Operasional)</option>
-              <option value="admin">Admin (Akses Penuh Sistem)</option>
+              <option value="operator">Operator (Monitoring & Operations)</option>
+              <option value="admin">Admin (Full System Access)</option>
             </Select>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-              Batal
+              Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Menyimpan..." : "Simpan Pengguna"}
+              {isSubmitting ? "Saving..." : "Save User"}
             </Button>
           </div>
         </form>

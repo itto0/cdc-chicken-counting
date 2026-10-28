@@ -54,11 +54,11 @@ export function EditUserModal({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (isSelf && !isActive) {
-      setErrorMsg("Anda tidak dapat menonaktifkan akun sendiri");
+      setErrorMsg("You cannot deactivate your own account");
       return;
     }
     if (isLastActiveAdmin && (role !== "admin" || !isActive)) {
-      setErrorMsg("Tidak dapat mengubah peran atau menonaktifkan satu-satunya admin aktif");
+      setErrorMsg("Cannot change role or deactivate the only active admin");
       return;
     }
 
@@ -68,7 +68,7 @@ export function EditUserModal({
       await onSubmit(user.id, { role, is_active: isActive });
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Gagal memperbarui pengguna";
+      const msg = err instanceof Error ? err.message : "Failed to update user";
       setErrorMsg(msg);
     } finally {
       setIsSubmitting(false);
@@ -91,13 +91,13 @@ export function EditUserModal({
             <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
               <UserCog className="w-5 h-5" />
             </div>
-            <h2 id="edit-user-modal-title" className="text-lg font-semibold text-slate-900">Ubah Data Pengguna</h2>
+            <h2 id="edit-user-modal-title" className="text-lg font-semibold text-slate-900">Edit User</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            aria-label="Tutup"
+            aria-label="Close"
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-5 h-5" />
@@ -112,33 +112,36 @@ export function EditUserModal({
             </div>
           )}
 
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-            <span className="text-slate-500 font-medium">Username: </span>
-            <span className="font-semibold text-slate-900">{user.username}</span>
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm flex items-center justify-between">
+            <div>
+              <span className="text-slate-500 font-medium">Username: </span>
+              <span className="font-semibold text-slate-900">{user.username}</span>
+            </div>
+            <span className="text-xs text-slate-400">(cannot be changed)</span>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Peran (Role)
+              Role
             </label>
             <Select
               value={role}
               onChange={(e) => setRole(e.target.value as "admin" | "operator")}
               disabled={isSubmitting || isLastActiveAdmin}
             >
-              <option value="operator">Operator</option>
-              <option value="admin">Admin</option>
+              <option value="operator">Operator (Monitoring & Operations)</option>
+              <option value="admin">Admin (Full System Access)</option>
             </Select>
             {isLastActiveAdmin && (
               <p className="text-xs text-amber-600 mt-1">
-                Peran tidak dapat diturunkan karena merupakan satu-satunya admin aktif.
+                Role cannot be demoted because this is the only active admin.
               </p>
             )}
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Status Akun
+              Account Status
             </label>
             <div className="flex items-center gap-3 pt-1">
               <label className="inline-flex items-center gap-2 cursor-pointer">
@@ -149,27 +152,27 @@ export function EditUserModal({
                   disabled={isSubmitting || isSelf || isLastActiveAdmin}
                   className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 disabled:opacity-50"
                 />
-                <span className="text-sm font-medium text-slate-700">Akun Aktif</span>
+                <span className="text-sm font-medium text-slate-700">Active Account</span>
               </label>
             </div>
             {isSelf && (
               <p className="text-xs text-amber-600 mt-1">
-                Anda tidak dapat menonaktifkan akun yang sedang digunakan saat ini.
+                You cannot deactivate the account currently in use.
               </p>
             )}
             {!isSelf && isLastActiveAdmin && (
               <p className="text-xs text-amber-600 mt-1">
-                Akun ini tidak dapat dinonaktifkan karena merupakan satu-satunya admin aktif.
+                This account cannot be deactivated because it is the only active admin.
               </p>
             )}
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-              Batal
+              Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
+              {isSubmitting ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </form>
