@@ -26,16 +26,19 @@ describe("ChangePasswordModal", () => {
     expect(dialog).toBeDefined();
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(dialog.getAttribute("aria-labelledby")).toBe("change-password-modal-title");
-    expect(screen.getByRole("heading", { name: "Ganti Password Saya" }).id).toBe(
+    expect(screen.getByRole("heading", { name: "Change My Password" }).id).toBe(
       "change-password-modal-title"
     );
-    expect(screen.getByText("Ganti Password Saya")).toBeDefined();
-    expect(screen.getByPlaceholderText("Masukkan password lama")).toBeDefined();
-    expect(screen.getByPlaceholderText("Minimal 6 karakter")).toBeDefined();
-    expect(screen.getByPlaceholderText("Ulangi password baru")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Perbarui Password" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Batal" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Tutup" })).toBeDefined();
+    expect(screen.getByText("Change My Password")).toBeDefined();
+    expect(screen.getByText("Current Password")).toBeDefined();
+    expect(screen.getByText("New Password")).toBeDefined();
+    expect(screen.getByText("Confirm New Password")).toBeDefined();
+    expect(screen.getByPlaceholderText("Enter current password")).toBeDefined();
+    expect(screen.getByPlaceholderText("Minimum 6 characters")).toBeDefined();
+    expect(screen.getByPlaceholderText("Re-enter new password")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Update Password" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Close" })).toBeDefined();
   });
 
   it("shows validation error when current password is empty", async () => {
@@ -43,16 +46,16 @@ describe("ChangePasswordModal", () => {
     render(<ChangePasswordModal isOpen={true} onClose={vi.fn()} />);
 
     // Keep current password empty, fill new & confirm
-    fireEvent.change(screen.getByPlaceholderText("Minimal 6 karakter"), {
+    fireEvent.change(screen.getByPlaceholderText("Minimum 6 characters"), {
       target: { value: "newsecret123" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Ulangi password baru"), {
+    fireEvent.change(screen.getByPlaceholderText("Re-enter new password"), {
       target: { value: "newsecret123" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Perbarui Password" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
 
-    expect(await screen.findByText("Password saat ini wajib diisi")).toBeDefined();
+    expect(await screen.findByText("Current password is required")).toBeDefined();
     expect(changePasswordSpy).not.toHaveBeenCalled();
   });
 
@@ -60,19 +63,19 @@ describe("ChangePasswordModal", () => {
     const changePasswordSpy = vi.spyOn(usersApi, "changePassword");
     render(<ChangePasswordModal isOpen={true} onClose={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Masukkan password lama"), {
+    fireEvent.change(screen.getByPlaceholderText("Enter current password"), {
       target: { value: "oldsecret123" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Minimal 6 karakter"), {
+    fireEvent.change(screen.getByPlaceholderText("Minimum 6 characters"), {
       target: { value: "12345" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Ulangi password baru"), {
+    fireEvent.change(screen.getByPlaceholderText("Re-enter new password"), {
       target: { value: "12345" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Perbarui Password" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
 
-    expect(await screen.findByText("Password baru minimal 6 karakter")).toBeDefined();
+    expect(await screen.findByText("New password must be at least 6 characters")).toBeDefined();
     expect(changePasswordSpy).not.toHaveBeenCalled();
   });
 
@@ -80,20 +83,20 @@ describe("ChangePasswordModal", () => {
     const changePasswordSpy = vi.spyOn(usersApi, "changePassword");
     render(<ChangePasswordModal isOpen={true} onClose={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Masukkan password lama"), {
+    fireEvent.change(screen.getByPlaceholderText("Enter current password"), {
       target: { value: "samesame123" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Minimal 6 karakter"), {
+    fireEvent.change(screen.getByPlaceholderText("Minimum 6 characters"), {
       target: { value: "samesame123" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Ulangi password baru"), {
+    fireEvent.change(screen.getByPlaceholderText("Re-enter new password"), {
       target: { value: "samesame123" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Perbarui Password" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
 
     expect(
-      await screen.findByText("Password baru harus berbeda dari password saat ini")
+      await screen.findByText("New password must be different from current password")
     ).toBeDefined();
     expect(changePasswordSpy).not.toHaveBeenCalled();
   });
@@ -102,19 +105,19 @@ describe("ChangePasswordModal", () => {
     const changePasswordSpy = vi.spyOn(usersApi, "changePassword");
     render(<ChangePasswordModal isOpen={true} onClose={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Masukkan password lama"), {
+    fireEvent.change(screen.getByPlaceholderText("Enter current password"), {
       target: { value: "oldsecret123" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Minimal 6 karakter"), {
+    fireEvent.change(screen.getByPlaceholderText("Minimum 6 characters"), {
       target: { value: "newsecret123" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Ulangi password baru"), {
+    fireEvent.change(screen.getByPlaceholderText("Re-enter new password"), {
       target: { value: "differentsecret123" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Perbarui Password" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
 
-    expect(await screen.findByText("Konfirmasi password baru tidak cocok")).toBeDefined();
+    expect(await screen.findByText("New passwords do not match")).toBeDefined();
     expect(changePasswordSpy).not.toHaveBeenCalled();
   });
 
@@ -127,18 +130,18 @@ describe("ChangePasswordModal", () => {
 
     render(<ChangePasswordModal isOpen={true} onClose={onClose} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Masukkan password lama"), {
+    fireEvent.change(screen.getByPlaceholderText("Enter current password"), {
       target: { value: "currentpwd123" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Minimal 6 karakter"), {
+    fireEvent.change(screen.getByPlaceholderText("Minimum 6 characters"), {
       target: { value: "brandnewpwd456" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Ulangi password baru"), {
+    fireEvent.change(screen.getByPlaceholderText("Re-enter new password"), {
       target: { value: "brandnewpwd456" },
     });
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Perbarui Password" }));
+      fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
     });
 
     expect(changePasswordSpy).toHaveBeenCalledWith({
@@ -146,13 +149,13 @@ describe("ChangePasswordModal", () => {
       new_password: "brandnewpwd456",
     });
 
-    expect(screen.getByText("Password berhasil diperbarui!")).toBeDefined();
+    expect(screen.getByText("Password updated successfully!")).toBeDefined();
 
     // Inputs and submit button should be disabled upon success
-    const currentInput = screen.getByPlaceholderText("Masukkan password lama") as HTMLInputElement;
-    const newInput = screen.getByPlaceholderText("Minimal 6 karakter") as HTMLInputElement;
-    const confirmInput = screen.getByPlaceholderText("Ulangi password baru") as HTMLInputElement;
-    const submitBtn = screen.getByRole("button", { name: "Perbarui Password" }) as HTMLButtonElement;
+    const currentInput = screen.getByPlaceholderText("Enter current password") as HTMLInputElement;
+    const newInput = screen.getByPlaceholderText("Minimum 6 characters") as HTMLInputElement;
+    const confirmInput = screen.getByPlaceholderText("Re-enter new password") as HTMLInputElement;
+    const submitBtn = screen.getByRole("button", { name: "Update Password" }) as HTMLButtonElement;
 
     expect(currentInput.disabled).toBe(true);
     expect(newInput.disabled).toBe(true);
@@ -176,23 +179,23 @@ describe("ChangePasswordModal", () => {
 
     render(<ChangePasswordModal isOpen={true} onClose={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Masukkan password lama"), {
+    fireEvent.change(screen.getByPlaceholderText("Enter current password"), {
       target: { value: "wrongpassword" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Minimal 6 karakter"), {
+    fireEvent.change(screen.getByPlaceholderText("Minimum 6 characters"), {
       target: { value: "brandnewpwd456" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Ulangi password baru"), {
+    fireEvent.change(screen.getByPlaceholderText("Re-enter new password"), {
       target: { value: "brandnewpwd456" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Perbarui Password" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
 
     expect(await screen.findByText("Current password is incorrect")).toBeDefined();
     expect(changePasswordSpy).toHaveBeenCalledTimes(1);
 
     // Form inputs and submit button re-enabled after failure
-    const submitBtn = screen.getByRole("button", { name: "Perbarui Password" }) as HTMLButtonElement;
+    const submitBtn = screen.getByRole("button", { name: "Update Password" }) as HTMLButtonElement;
     expect(submitBtn.disabled).toBe(false);
   });
 
@@ -201,19 +204,19 @@ describe("ChangePasswordModal", () => {
 
     render(<ChangePasswordModal isOpen={true} onClose={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Masukkan password lama"), {
+    fireEvent.change(screen.getByPlaceholderText("Enter current password"), {
       target: { value: "oldsecret123" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Minimal 6 karakter"), {
+    fireEvent.change(screen.getByPlaceholderText("Minimum 6 characters"), {
       target: { value: "brandnewpwd456" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Ulangi password baru"), {
+    fireEvent.change(screen.getByPlaceholderText("Re-enter new password"), {
       target: { value: "brandnewpwd456" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Perbarui Password" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
 
-    expect(await screen.findByText("Gagal mengganti password")).toBeDefined();
+    expect(await screen.findByText("Failed to change password")).toBeDefined();
   });
 
   it("dismisses on Escape key press when not submitting", () => {
@@ -229,7 +232,7 @@ describe("ChangePasswordModal", () => {
     render(<ChangePasswordModal isOpen={true} onClose={onClose} />);
 
     // Click inside the dialog
-    fireEvent.click(screen.getByText("Ganti Password Saya"));
+    fireEvent.click(screen.getByText("Change My Password"));
     expect(onClose).not.toHaveBeenCalled();
 
     // Click backdrop
@@ -242,15 +245,15 @@ describe("ChangePasswordModal", () => {
     const onClose = vi.fn();
     render(<ChangePasswordModal isOpen={true} onClose={onClose} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Tutup" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onClose when Batal button is clicked", () => {
+  it("calls onClose when Cancel button is clicked", () => {
     const onClose = vi.fn();
     render(<ChangePasswordModal isOpen={true} onClose={onClose} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -264,27 +267,27 @@ describe("ChangePasswordModal", () => {
     const onClose = vi.fn();
     render(<ChangePasswordModal isOpen={true} onClose={onClose} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Masukkan password lama"), {
+    fireEvent.change(screen.getByPlaceholderText("Enter current password"), {
       target: { value: "currentpwd123" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Minimal 6 karakter"), {
+    fireEvent.change(screen.getByPlaceholderText("Minimum 6 characters"), {
       target: { value: "brandnewpwd456" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Ulangi password baru"), {
+    fireEvent.change(screen.getByPlaceholderText("Re-enter new password"), {
       target: { value: "brandnewpwd456" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Perbarui Password" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
 
     // While submitting:
     await waitFor(() => {
-      expect(screen.getByText("Menyimpan...")).toBeDefined();
+      expect(screen.getByText("Updating...")).toBeDefined();
     });
 
-    const submitBtn = screen.getByRole("button", { name: "Menyimpan..." }) as HTMLButtonElement;
-    const cancelBtn = screen.getByRole("button", { name: "Batal" }) as HTMLButtonElement;
-    const closeBtn = screen.getByRole("button", { name: "Tutup" }) as HTMLButtonElement;
-    const currentInput = screen.getByPlaceholderText("Masukkan password lama") as HTMLInputElement;
+    const submitBtn = screen.getByRole("button", { name: "Updating..." }) as HTMLButtonElement;
+    const cancelBtn = screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement;
+    const closeBtn = screen.getByRole("button", { name: "Close" }) as HTMLButtonElement;
+    const currentInput = screen.getByPlaceholderText("Enter current password") as HTMLInputElement;
 
     expect(submitBtn.disabled).toBe(true);
     expect(cancelBtn.disabled).toBe(true);
@@ -306,32 +309,32 @@ describe("ChangePasswordModal", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Password berhasil diperbarui!")).toBeDefined();
+      expect(screen.getByText("Password updated successfully!")).toBeDefined();
     });
   });
 
   it("resets fields and error state when reopened", () => {
     const { rerender } = render(<ChangePasswordModal isOpen={true} onClose={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Masukkan password lama"), {
+    fireEvent.change(screen.getByPlaceholderText("Enter current password"), {
       target: { value: "mysecret" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Minimal 6 karakter"), {
+    fireEvent.change(screen.getByPlaceholderText("Minimum 6 characters"), {
       target: { value: "123" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Perbarui Password" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
 
-    expect(screen.getByText("Password baru minimal 6 karakter")).toBeDefined();
+    expect(screen.getByText("New password must be at least 6 characters")).toBeDefined();
 
     // Close modal
     rerender(<ChangePasswordModal isOpen={false} onClose={vi.fn()} />);
-    expect(screen.queryByText("Ganti Password Saya")).toBeNull();
+    expect(screen.queryByText("Change My Password")).toBeNull();
 
     // Reopen modal
     rerender(<ChangePasswordModal isOpen={true} onClose={vi.fn()} />);
-    expect(screen.getByText("Ganti Password Saya")).toBeDefined();
-    expect(screen.queryByText("Password baru minimal 6 karakter")).toBeNull();
-    const currentInput = screen.getByPlaceholderText("Masukkan password lama") as HTMLInputElement;
+    expect(screen.getByText("Change My Password")).toBeDefined();
+    expect(screen.queryByText("New password must be at least 6 characters")).toBeNull();
+    const currentInput = screen.getByPlaceholderText("Enter current password") as HTMLInputElement;
     expect(currentInput.value).toBe("");
   });
 });

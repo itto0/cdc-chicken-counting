@@ -50,19 +50,19 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!currentPassword) {
-      setErrorMsg("Password saat ini wajib diisi");
+      setErrorMsg("Current password is required");
       return;
     }
     if (newPassword.length < 6) {
-      setErrorMsg("Password baru minimal 6 karakter");
+      setErrorMsg("New password must be at least 6 characters");
       return;
     }
     if (newPassword === currentPassword) {
-      setErrorMsg("Password baru harus berbeda dari password saat ini");
+      setErrorMsg("New password must be different from current password");
       return;
     }
     if (newPassword !== confirmPassword) {
-      setErrorMsg("Konfirmasi password baru tidak cocok");
+      setErrorMsg("New passwords do not match");
       return;
     }
 
@@ -74,12 +74,12 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
         current_password: currentPassword,
         new_password: newPassword,
       });
-      setSuccessMsg("Password berhasil diperbarui!");
+      setSuccessMsg("Password updated successfully!");
       timerRef.current = setTimeout(() => {
         onClose();
       }, 1500);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Gagal mengganti password";
+      const msg = err instanceof Error ? err.message : "Failed to change password";
       setErrorMsg(msg);
     } finally {
       setIsSubmitting(false);
@@ -102,13 +102,13 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
             <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
               <KeyRound className="w-5 h-5" />
             </div>
-            <h2 id="change-password-modal-title" className="text-lg font-semibold text-slate-900">Ganti Password Saya</h2>
+            <h2 id="change-password-modal-title" className="text-lg font-semibold text-slate-900">Change My Password</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            aria-label="Tutup"
+            aria-label="Close"
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-5 h-5" />
@@ -132,13 +132,13 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Password Saat Ini
+              Current Password
             </label>
             <Input
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Masukkan password lama"
+              placeholder="Enter current password"
               required
               disabled={isSubmitting || !!successMsg}
             />
@@ -146,13 +146,13 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Password Baru
+              New Password
             </label>
             <Input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Minimal 6 karakter"
+              placeholder="Minimum 6 characters"
               required
               disabled={isSubmitting || !!successMsg}
             />
@@ -160,13 +160,13 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Konfirmasi Password Baru
+              Confirm New Password
             </label>
             <Input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Ulangi password baru"
+              placeholder="Re-enter new password"
               required
               disabled={isSubmitting || !!successMsg}
             />
@@ -179,10 +179,10 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
               onClick={onClose}
               disabled={isSubmitting}
             >
-              Batal
+              Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting || !!successMsg}>
-              {isSubmitting ? "Menyimpan..." : "Perbarui Password"}
+              {isSubmitting ? "Updating..." : "Update Password"}
             </Button>
           </div>
         </form>
