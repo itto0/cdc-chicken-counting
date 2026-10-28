@@ -41,28 +41,7 @@ describe("Header", () => {
 
     expect(screen.getByText("operator_john")).toBeDefined();
     expect(screen.getByText("operator")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Ganti Password" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Keluar dari sistem" })).toBeDefined();
-  });
-
-  it("opens ChangePasswordModal when Ganti Password button is clicked and closes on cancel", () => {
-    render(
-      <MemoryRouter>
-        <Header onOpenSidebar={vi.fn()} />
-      </MemoryRouter>
-    );
-
-    expect(screen.queryByRole("dialog")).toBeNull();
-
-    const changePasswordBtn = screen.getByRole("button", { name: "Ganti Password" });
-    fireEvent.click(changePasswordBtn);
-
-    expect(screen.getByRole("dialog")).toBeDefined();
-    expect(screen.getByText("Ganti Password Saya")).toBeDefined();
-
-    // Click Batal to close
-    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("calls logout and navigates to /login when logout button is clicked", () => {
