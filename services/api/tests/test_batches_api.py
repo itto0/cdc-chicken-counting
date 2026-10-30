@@ -181,3 +181,15 @@ def test_get_batches_list_trailing_slash(client_and_db):
     assert resp.status_code == 200
     assert resp.json()["total"] == 1
 
+
+def test_get_batch_detail_cross_line_not_found(client_and_db):
+    client, db = client_and_db
+    line2 = Line(id="line-2", name="Line 2")
+    db.add(line2)
+    db.commit()
+
+    # batch_1 belongs to line-1; querying it under line-2 must return 404
+    resp = client.get("/api/v1/lines/line-2/batches/batch_1")
+    assert resp.status_code == 404
+
+
