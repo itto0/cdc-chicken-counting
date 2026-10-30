@@ -68,6 +68,9 @@ def init_db(target_engine=None) -> None:
                             conn.execute(text(f"CREATE INDEX ix_{tbl}_batch_id ON {tbl} (batch_id)"))
                     except Exception:
                         pass
+                if "class_name" not in event_cols:
+                    with eng.begin() as conn:
+                        conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN class_name VARCHAR(64) DEFAULT 'chicken'"))
     except Exception:
         pass
 
