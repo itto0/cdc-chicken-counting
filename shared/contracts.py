@@ -3,10 +3,22 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, model_validator
 
 
+class CountingBatchDTO(BaseModel):
+    batch_id: str
+    line_id: str = "line-1"
+    start_time: datetime
+    finish_time: datetime | None = None
+    total_count: int = Field(default=0, ge=0)
+    status: Literal["ACTIVE", "COMPLETED"] = "ACTIVE"
+
+
 class CountEventDTO(BaseModel):
     track_id: int
     ts_utc: datetime
     confidence: float = Field(ge=0.0, le=1.0)
+    line_id: str = "line-1"
+    class_name: str = "chicken"
+    batch_id: str | None = None
 
 
 class CountAggregateDTO(BaseModel):
@@ -34,6 +46,7 @@ class SyncBatchPayload(BaseModel):
     events: list[CountEventDTO] = Field(default_factory=list)
     aggregates: list[CountAggregateDTO] = Field(default_factory=list)
     health: HealthSampleDTO | None = None
+    batches: list[CountingBatchDTO] = Field(default_factory=list)
 
 
 class LineConfigDTO(BaseModel):
@@ -80,6 +93,7 @@ class AlarmDTO(BaseModel):
 
 
 __all__ = [
+    "CountingBatchDTO",
     "CountEventDTO",
     "CountAggregateDTO",
     "HealthSampleDTO",
