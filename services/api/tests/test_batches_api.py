@@ -193,3 +193,62 @@ def test_get_batch_detail_cross_line_not_found(client_and_db):
     assert resp.status_code == 404
 
 
+def test_batches_deterministic_ordering_on_same_start_time(client_and_db):
+    client, db = client_and_db
+    t_same = datetime(2026, 10, 30, 15, 0, 0, tzinfo=timezone.utc)
+    b_first = CountingBatch(
+        batch_id="batch_tie_1",
+        line_id="line-1",
+        start_time=t_same,
+        total_count=10,
+        status="COMPLETED",
+    )
+    b_second = CountingBatch(
+        batch_id="batch_tie_2",
+        line_id="line-1",
+        start_time=t_same,
+        total_count=20,
+        status="COMPLETED",
+    )
+    db.add_all([b_first, b_second])
+    db.commit()
+
+    # In list_batches, b_second has a higher primary key id than b_first, so it must appear first
+    resp = client.get("/api/v1/lines/line-1/batches?status=COMPLETED")
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    tie_items = [item for item in items if item["batch_id"] in ("batch_tie_1", "batch_tie_2")]
+    assert len(tie_items) == 2
+    assert tie_items[0]["batch_id"] == "batch_tie_2"
+    assert tie_items[1]["batch_id"] == "batch_tie_1"
+
+    # In get_latest_batch, between b_first and b_second (latest start_time), b_second must win
+    resp_latest = client.get("/api/v1/lines/line-1/batches/latest")
+    assert resp_latest.status_code == 200
+    assert resp_latest.json()["batch_id"] == "batch_tie_2"
+
+
+def test_batch_detail_events_count_scoped_to_line(client_and_db):
+    client, db = client_and_db
+    t0 = datetime(2026, 10, 30, 10, 0, 0, tzinfo=timezone.utc)
+    # batch_1 has 2 events on line-1 from fixture
+    # Add an event with batch_id="batch_1" but on line-2 (e.g. cross-line data)
+    ev_other = CountEvent(
+        track_id=999,
+        ts_utc=t0,
+        confidence=0.9,
+        line_id="line-2",
+        class_name="chicken",
+        batch_id="batch_1",
+    )
+    db.add(ev_other)
+    db.commit()
+
+    resp = client.get("/api/v1/lines/line-1/batches/batch_1")
+    assert resp.status_code == 200
+    data = resp.json()
+    # Must only count the 2 events on line-1, excluding line-2 event
+    assert data["events_count"] == 2
+
+
+

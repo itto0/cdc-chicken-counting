@@ -58,7 +58,7 @@ class CountingBatch(Base):
     status: Mapped[str] = mapped_column(String(32), default="ACTIVE", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
-    line: Mapped["Line"] = relationship("Line", back_populates="batches", lazy="joined")
+    line: Mapped["Line"] = relationship("Line", back_populates="batches")
 
     def __repr__(self) -> str:
         return f"<CountingBatch(id={self.id}, batch_id='{self.batch_id}', line_id='{self.line_id}', status='{self.status}', total_count={self.total_count})>"

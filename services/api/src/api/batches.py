@@ -71,7 +71,7 @@ def list_batches(
     total = query.count()
     offset = (page - 1) * page_size
     items = (
-        query.order_by(CountingBatch.start_time.desc())
+        query.order_by(CountingBatch.start_time.desc(), CountingBatch.id.desc())
         .offset(offset)
         .limit(page_size)
         .all()
@@ -95,7 +95,7 @@ def get_latest_batch(
     batch = (
         db.query(CountingBatch)
         .filter(CountingBatch.line_id == line_id)
-        .order_by(CountingBatch.start_time.desc())
+        .order_by(CountingBatch.start_time.desc(), CountingBatch.id.desc())
         .first()
     )
     if not batch:
@@ -120,7 +120,7 @@ def get_batch_detail(
 
     events_count = (
         db.query(func.count(CountEvent.id))
-        .filter(CountEvent.batch_id == batch.batch_id)
+        .filter(CountEvent.line_id == line_id, CountEvent.batch_id == batch.batch_id)
         .scalar()
         or 0
     )

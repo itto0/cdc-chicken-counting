@@ -706,6 +706,103 @@ def test_sync_alias_endpoint_ingests_batches(client, db_session):
     assert batch.total_count == 5
 
 
+def test_sync_batch_line_assignment_fallback(client, db_session):
+    now = datetime.now(timezone.utc)
+    # Batch 1 has default line_id="line-1", payload line_id="line-fallback" -> should become "line-fallback"
+    # Batch 2 has explicit line_id="line-custom" -> should remain "line-custom"
+    payload = {
+        "line_id": "line-fallback",
+        "events": [],
+        "aggregates": [],
+        "batches": [
+            {
+                "batch_id": "batch_fb_001",
+                "line_id": "line-1",
+                "start_time": now.isoformat(),
+                "total_count": 10,
+                "status": "ACTIVE",
+            },
+            {
+                "batch_id": "batch_fb_002",
+                "line_id": "line-custom",
+                "start_time": now.isoformat(),
+                "total_count": 20,
+                "status": "ACTIVE",
+            },
+        ],
+    }
+
+    resp = client.post("/api/v1/sync/batch", json=payload)
+    assert resp.status_code == 200
+    assert resp.json()["ingested_batches"] == 2
+
+    b1 = db_session.query(CountingBatch).filter_by(batch_id="batch_fb_001").first()
+    assert b1 is not None
+    assert b1.line_id == "line-fallback"
+
+    b2 = db_session.query(CountingBatch).filter_by(batch_id="batch_fb_002").first()
+    assert b2 is not None
+    assert b2.line_id == "line-custom"
+
+
+def test_sync_batch_concurrency_integrity_error_fallback(client, db_session, monkeypatch):
+    now = datetime.now(timezone.utc)
+    finish_now = datetime.now(timezone.utc)
+
+    # Pre-seed a batch in the database
+    seeded_batch = CountingBatch(
+        batch_id="batch_race_001",
+        line_id="line-1",
+        start_time=now,
+        total_count=5,
+        status="ACTIVE",
+    )
+    db_session.add(seeded_batch)
+    db_session.commit()
+
+    # Simulate TOCTOU: existing_batches query misses the row (returns empty),
+    # so sync_batch attempts to insert it, triggering IntegrityError on flush.
+    from sqlalchemy.orm import Query
+
+    orig_all = Query.all
+
+    def mock_all(self):
+        # If this is the batch_id in_ query, simulate race where it wasn't found initially
+        if "batches.batch_id IN" in str(self):
+            return []
+        return orig_all(self)
+
+    monkeypatch.setattr(Query, "all", mock_all)
+
+    payload = {
+        "line_id": "line-1",
+        "events": [],
+        "aggregates": [],
+        "batches": [
+            {
+                "batch_id": "batch_race_001",
+                "line_id": "line-1",
+                "start_time": now.isoformat(),
+                "finish_time": finish_now.isoformat(),
+                "total_count": 99,
+                "status": "COMPLETED",
+            }
+        ],
+    }
+
+    resp = client.post("/api/v1/sync/batch", json=payload)
+    assert resp.status_code == 200
+    assert resp.json()["ingested_batches"] == 1
+
+    db_session.expire_all()
+    batch = db_session.query(CountingBatch).filter_by(batch_id="batch_race_001").first()
+    assert batch is not None
+    assert batch.total_count == 99
+    assert batch.status == "COMPLETED"
+    assert batch.finish_time is not None
+
+
+
 
 
 

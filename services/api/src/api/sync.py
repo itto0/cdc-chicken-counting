@@ -77,9 +77,10 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
             for b in db.query(CountingBatch).filter(CountingBatch.batch_id.in_(batch_ids)).all()
         }
         for b_dto in payload.batches:
-            line = db.query(Line).filter(Line.id == b_dto.line_id).first()
+            target_line_id = payload.line_id if (not b_dto.line_id or b_dto.line_id == "line-1") else b_dto.line_id
+            line = db.query(Line).filter(Line.id == target_line_id).first()
             if not line:
-                line = Line(id=b_dto.line_id, name=f"Line {b_dto.line_id}")
+                line = Line(id=target_line_id, name=f"Line {target_line_id}")
                 db.add(line)
                 db.flush()
 
@@ -91,14 +92,24 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
             else:
                 batch = CountingBatch(
                     batch_id=b_dto.batch_id,
-                    line_id=b_dto.line_id,
+                    line_id=target_line_id,
                     start_time=b_dto.start_time,
                     finish_time=b_dto.finish_time,
                     total_count=b_dto.total_count,
                     status=b_dto.status,
                 )
-                db.add(batch)
-                existing_batches[b_dto.batch_id] = batch
+                try:
+                    with db.begin_nested():
+                        db.add(batch)
+                        db.flush()
+                    existing_batches[b_dto.batch_id] = batch
+                except IntegrityError:
+                    existing = db.query(CountingBatch).filter_by(batch_id=b_dto.batch_id).first()
+                    if existing:
+                        existing.finish_time = b_dto.finish_time
+                        existing.total_count = b_dto.total_count
+                        existing.status = b_dto.status
+                        existing_batches[b_dto.batch_id] = existing
             ingested_batches += 1
 
     db.commit()
