@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from services.api.src.db.models import Base, CountAggregate, CountEvent, HealthSample
+from services.api.src.db.models import Base, CountAggregate, CountEvent, CountingBatch, HealthSample
 from services.api.src.db.session import get_db
 from services.api.src.main import app
 
@@ -45,6 +45,11 @@ def test_db(setup_test_db):
         yield db
     finally:
         db.close()
+
+
+@pytest.fixture
+def db_session(test_db):
+    return test_db
 
 
 def test_sync_batch_endpoint_ingests_and_deduplicates():
@@ -589,6 +594,117 @@ def test_sync_batch_broadcasts_single_count_event_for_multi_event_batch(setup_te
     assert count_broadcasts[0][1]["track_id"] == 303
     assert count_broadcasts[0][1]["total_today"] == 3
     assert count_broadcasts[0][1]["ts_utc"].endswith("Z")
+
+
+def test_sync_batch_ingests_and_upserts_counting_batches(client, db_session):
+    now = datetime.now(timezone.utc)
+    payload = {
+        "line_id": "line-1",
+        "events": [
+            {
+                "track_id": 101,
+                "ts_utc": now.isoformat(),
+                "confidence": 0.95,
+                "line_id": "line-1",
+                "class_name": "chicken",
+                "batch_id": "batch_test_001",
+            }
+        ],
+        "aggregates": [],
+        "batches": [
+            {
+                "batch_id": "batch_test_001",
+                "line_id": "line-1",
+                "start_time": now.isoformat(),
+                "finish_time": None,
+                "total_count": 1,
+                "status": "ACTIVE",
+            }
+        ],
+    }
+
+    # Initial sync: inserts batch and event with batch_id
+    resp = client.post("/api/v1/sync/batch", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] in ("ok", "success")
+    assert data["ingested_events"] == 1
+    assert data["ingested_batches"] == 1
+
+    # Verify batch in DB
+    batch = db_session.query(CountingBatch).filter_by(batch_id="batch_test_001").first()
+    assert batch is not None
+    assert batch.status == "ACTIVE"
+    assert batch.total_count == 1
+
+    # Verify event has batch_id
+    event = db_session.query(CountEvent).filter_by(track_id=101).first()
+    assert event is not None
+    assert event.batch_id == "batch_test_001"
+
+    # Subsequent sync: updates existing batch to COMPLETED
+    finish_now = datetime.now(timezone.utc)
+    payload_update = {
+        "line_id": "line-1",
+        "events": [],
+        "aggregates": [],
+        "batches": [
+            {
+                "batch_id": "batch_test_001",
+                "line_id": "line-1",
+                "start_time": now.isoformat(),
+                "finish_time": finish_now.isoformat(),
+                "total_count": 50,
+                "status": "COMPLETED",
+            }
+        ],
+    }
+    resp_update = client.post("/api/v1/sync/batch", json=payload_update)
+    assert resp_update.status_code == 200
+    assert resp_update.json()["ingested_batches"] == 1
+
+    db_session.expire_all()
+    updated_batch = db_session.query(CountingBatch).filter_by(batch_id="batch_test_001").first()
+    assert updated_batch.status == "COMPLETED"
+    assert updated_batch.total_count == 50
+    assert updated_batch.finish_time is not None
+
+
+def test_sync_alias_endpoint_ingests_batches(client, db_session):
+    now = datetime.now(timezone.utc)
+    payload = {
+        "line_id": "line-alias",
+        "events": [
+            {
+                "track_id": 102,
+                "ts_utc": now.isoformat(),
+                "confidence": 0.95,
+                "line_id": "line-alias",
+                "batch_id": "batch_test_alias_001",
+            }
+        ],
+        "aggregates": [],
+        "batches": [
+            {
+                "batch_id": "batch_test_alias_001",
+                "line_id": "line-alias",
+                "start_time": now.isoformat(),
+                "finish_time": None,
+                "total_count": 5,
+                "status": "ACTIVE",
+            }
+        ],
+    }
+
+    resp = client.post("/api/v1/sync", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ingested_batches"] == 1
+
+    batch = db_session.query(CountingBatch).filter_by(batch_id="batch_test_alias_001").first()
+    assert batch is not None
+    assert batch.total_count == 5
+
 
 
 

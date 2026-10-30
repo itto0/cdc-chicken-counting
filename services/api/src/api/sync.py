@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from services.api.src.api.live import broadcast_line_update
-from services.api.src.db.models import CountAggregate, CountEvent, HealthSample, Line
+from services.api.src.db.models import CountAggregate, CountEvent, CountingBatch, HealthSample, Line
 from services.api.src.db.session import get_db
 from services.api.src.services.alarms import AlarmEvaluator
 from services.api.src.services.preview import is_stream_requested
@@ -29,6 +29,8 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
             track_id=ev.track_id,
             ts_utc=ev.ts_utc,
             confidence=ev.confidence,
+            batch_id=ev.batch_id,
+            class_name=ev.class_name,
         )
         try:
             with db.begin_nested():
@@ -66,6 +68,38 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
         )
         db.add(health_record)
         health_ingested = True
+
+    ingested_batches = 0
+    if payload.batches:
+        batch_ids = [b.batch_id for b in payload.batches]
+        existing_batches = {
+            b.batch_id: b
+            for b in db.query(CountingBatch).filter(CountingBatch.batch_id.in_(batch_ids)).all()
+        }
+        for b_dto in payload.batches:
+            line = db.query(Line).filter(Line.id == b_dto.line_id).first()
+            if not line:
+                line = Line(id=b_dto.line_id, name=f"Line {b_dto.line_id}")
+                db.add(line)
+                db.flush()
+
+            if b_dto.batch_id in existing_batches:
+                batch = existing_batches[b_dto.batch_id]
+                batch.finish_time = b_dto.finish_time
+                batch.total_count = b_dto.total_count
+                batch.status = b_dto.status
+            else:
+                batch = CountingBatch(
+                    batch_id=b_dto.batch_id,
+                    line_id=b_dto.line_id,
+                    start_time=b_dto.start_time,
+                    finish_time=b_dto.finish_time,
+                    total_count=b_dto.total_count,
+                    status=b_dto.status,
+                )
+                db.add(batch)
+                existing_batches[b_dto.batch_id] = batch
+            ingested_batches += 1
 
     db.commit()
 
@@ -204,6 +238,7 @@ def sync_batch(payload: SyncBatchPayload, db: Session = Depends(get_db)):
         "ingested_events": ingested_events,
         "duplicates_skipped": duplicates_skipped,
         "ingested_aggregates": ingested_aggregates,
+        "ingested_batches": ingested_batches,
         "health_ingested": health_ingested,
         "stream_requested": is_stream_requested(payload.line_id),
     }
