@@ -10,6 +10,7 @@ init_env()
 
 from services.api.src.api.alarms import router as alarms_router
 from services.api.src.api.auth import router as auth_router
+from services.api.src.api.batches import batches_router
 from services.api.src.api.counts import router as counts_router
 from services.api.src.api.lines import router as lines_router
 from services.api.src.api.live import router as live_router
@@ -154,6 +155,7 @@ app.add_middleware(
 )
 
 app.include_router(sync_router)
+app.include_router(batches_router)
 app.include_router(live_router)
 app.include_router(reports_router)
 app.include_router(summary_router)
