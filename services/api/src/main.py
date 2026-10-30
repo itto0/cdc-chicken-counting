@@ -16,7 +16,7 @@ from services.api.src.api.live import router as live_router
 from services.api.src.api.reports import router as reports_router
 from services.api.src.api.summary import router as summary_router
 from services.api.src.api.sync import router as sync_router
-from services.api.src.db.models import Base, Line, User
+from services.api.src.db.models import Base, CountingBatch, Line, User
 from services.api.src.db.session import engine
 from services.api.src.services.auth import hash_password
 from sqlalchemy import inspect, select, text
@@ -53,52 +53,73 @@ def init_db(target_engine=None) -> None:
     except Exception:
         pass
 
-    with Session(eng) as session:
-        if not session.get(Line, "line-1"):
-            session.add(
-                Line(
-                    id="line-1",
-                    name="Lini Konveyor 1",
-                    daily_target=62000,
-                    line_direction="right",
-                    line_coords="960,200,960,950",
-                    is_active=True,
-                )
-            )
-        if not session.get(Line, "lineA"):
-            session.add(
-                Line(
-                    id="lineA",
-                    name="Lini Konveyor A",
-                    daily_target=62000,
-                    line_direction="down",
-                    line_coords="0,240,640,240",
-                    is_active=True,
-                )
-            )
+    # Dynamic migration for events and count_events.batch_id
+    try:
+        inspector = inspect(eng)
+        tables = inspector.get_table_names()
+        for tbl in ("events", "count_events"):
+            if tbl in tables:
+                event_cols = [c["name"] for c in inspector.get_columns(tbl)]
+                if "batch_id" not in event_cols:
+                    with eng.begin() as conn:
+                        conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN batch_id VARCHAR(128)"))
+                    try:
+                        with eng.begin() as conn:
+                            conn.execute(text(f"CREATE INDEX ix_{tbl}_batch_id ON {tbl} (batch_id)"))
+                    except Exception:
+                        pass
+    except Exception:
+        pass
 
-        admin_user = session.execute(select(User).where(User.username == "admin")).scalar_one_or_none()
-        if not admin_user:
-            session.add(
-                User(
-                    username="admin",
-                    password_hash=hash_password("admin123"),
-                    role="admin",
-                    is_active=True,
+    try:
+        with Session(eng) as session:
+            if not session.get(Line, "line-1"):
+                session.add(
+                    Line(
+                        id="line-1",
+                        name="Lini Konveyor 1",
+                        daily_target=62000,
+                        line_direction="right",
+                        line_coords="960,200,960,950",
+                        is_active=True,
+                    )
                 )
-            )
-        operator_user = session.execute(select(User).where(User.username == "operator")).scalar_one_or_none()
-        if not operator_user:
-            session.add(
-                User(
-                    username="operator",
-                    password_hash=hash_password("operator123"),
-                    role="operator",
-                    is_active=True,
+            if not session.get(Line, "lineA"):
+                session.add(
+                    Line(
+                        id="lineA",
+                        name="Lini Konveyor A",
+                        daily_target=62000,
+                        line_direction="down",
+                        line_coords="0,240,640,240",
+                        is_active=True,
+                    )
                 )
-            )
 
-        session.commit()
+            admin_user = session.execute(select(User).where(User.username == "admin")).scalar_one_or_none()
+            if not admin_user:
+                session.add(
+                    User(
+                        username="admin",
+                        password_hash=hash_password("admin123"),
+                        role="admin",
+                        is_active=True,
+                    )
+                )
+            operator_user = session.execute(select(User).where(User.username == "operator")).scalar_one_or_none()
+            if not operator_user:
+                session.add(
+                    User(
+                        username="operator",
+                        password_hash=hash_password("operator123"),
+                        role="operator",
+                        is_active=True,
+                    )
+                )
+
+            session.commit()
+    except Exception:
+        pass
 
 
 @asynccontextmanager

@@ -295,6 +295,7 @@ def test_metadata_tables_registered():
         "alarms",
         "users",
         "api_keys",
+        "batches",
     }
 
 
@@ -310,6 +311,7 @@ def test_init_db_helper(tmp_path):
         "alarms",
         "users",
         "api_keys",
+        "batches",
     }
     test_engine.dispose()
 
